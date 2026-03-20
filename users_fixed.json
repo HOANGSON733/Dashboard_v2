@@ -1,0 +1,14 @@
+{
+  "users": [
+    {
+      "username": "Son@123",
+      "hashed_password": "$2b$12$dUrT4Ixrc2kclBkKFXuZ8Omhw.4awb3vmKb80g.a4pXFvZAQiSjUC",
+      "domains": ["drtuananh.com", "huyenhocviet.com", "sdtc.vn"]
+    },
+    {
+      "username": "Son@1234",
+      "hashed_password": "$2b$12$iclqUOex/yUhLqD.eRe.BOcv7RZH5WtPrUdY1smwRJG7nF0e9aXtu",
+      "domains": ["drtuananh.com"]
+    }
+  ]
+}

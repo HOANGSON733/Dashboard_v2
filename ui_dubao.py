@@ -253,7 +253,6 @@ def render_dubao(df):
                 <div class="db-metric-value">{current_str}</div>
             </div>
             """, unsafe_allow_html=True)
-
         with mc2:
             st.markdown(f"""
             <div class="db-metric-card">

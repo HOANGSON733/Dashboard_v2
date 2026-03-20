@@ -29,12 +29,19 @@ from ui_ga import render_ga_ui
 
 
 
+
+
 # ===================== INITIALIZE =====================
 setup_page_config()
-init_session_state()
+init_session_state()  # Loads user_id/user_domains from persistent storage
 
 # Apply custom CSS
 st.markdown(get_custom_css(), unsafe_allow_html=True)
+
+# Auth validation - full check
+import user_auth
+if not user_auth.validate_session():
+    st.switch_page("pages/auth.py")
 
 # Encode logo once at startup (used in both header and sidebar)
 import base64
@@ -50,6 +57,8 @@ else:
             <p style='font-size: 1rem; opacity: 0.7; margin: 0; padding: 0;'>Phân tích SEO toàn diện với AI Insights & Forecasting</p>
         </div>
     """, unsafe_allow_html=True)
+
+
 
 
 # ===================== SIDEBAR =====================
@@ -78,9 +87,22 @@ try:
 except Exception as e:
     st.sidebar.error(f"Logo error: {e}")
 
+st.sidebar.markdown("---")
+if st.sidebar.button("🚪 Đăng xuất"):
+    if 'user_id' in st.session_state:
+        del st.session_state['user_id']
+    if 'user_domains' in st.session_state:
+        del st.session_state['user_domains']
+    st.switch_page("pages/auth.py")
+
 # Domain selector
+user_domains = st.session_state.get('user_domains', [])
+available_domains = [d for d in SHEETS.keys() if d in user_domains]
+if not available_domains:
+    st.error("❌ Không có domain nào được phép truy cập")
+    st.stop()
+domains = available_domains
 st.sidebar.markdown("**🌐 Domain**")
-domains = list(SHEETS.keys())
 selected_domain = st.sidebar.selectbox("🌐 Domain", domains, label_visibility="collapsed")
 st.session_state.selected_domain = selected_domain
 sheet_id = SHEETS[selected_domain]["sheet_id"]
