@@ -3,12 +3,58 @@
     {
       "username": "Son@123",
       "hashed_password": "$2b$12$dUrT4Ixrc2kclBkKFXuZ8Omhw.4awb3vmKb80g.a4pXFvZAQiSjUC",
-      "domains": ["drtuananh.com", "huyenhocviet.com", "sdtc.vn"]
+      "sheets_config": [
+        {
+          "domain": "drtuananh.com",
+          "sheet_id": "1gIIXt6fC9lXR2vRhnrLJxBoIT2pIvgNfPP8Ct96_D6k",
+          "worksheet": "Ngày_22_01_2026"
+        },
+        {
+          "domain": "huyenhocviet.com",
+          "sheet_id": "1cuj6slTO1wroK2OkBvd1HdyD_WKXTRmqqoC0bCEmKJE",
+          "worksheet": "Ngày_22_01_2026"
+        },
+        {
+          "domain": "sdtc.vn",
+          "sheet_id": "1EIHXRlUZFYvxmXDd31Dn5jcQ0QzwH6sGTllGfuRNX3s",
+          "worksheet": "Ngày_22_01_2026"
+        }
+      ]
     },
     {
       "username": "Son@1234",
       "hashed_password": "$2b$12$iclqUOex/yUhLqD.eRe.BOcv7RZH5WtPrUdY1smwRJG7nF0e9aXtu",
-      "domains": ["drtuananh.com"]
+      "sheets_config": [
+        {
+          "domain": "drtuananh.com",
+          "sheet_id": "1gIIXt6fC9lXR2vRhnrLJxBoIT2pIvgNfPP8Ct96_D6k",
+          "worksheet": "Ngày_22_01_2026"
+        }
+      ],
+      "display_name": "Son@1234"
+    },
+    {
+      "username": "Son@112",
+      "hashed_password": "JDJiJDEyJHhDUmlxV2hlcW9kR2RaQVU2aVpFMXVBU2lhVlEyQkptMlVBUVRDQnJUY2NyMjF1YmNmYTJh",
+      "sheets_config": [
+        {
+          "domain": "Huyenhocviet",
+          "sheet_id": "1cuj6slTO1wroK2OkBvd1HdyD_WKXTRmqqoC0bCEmKJE",
+          "worksheet": "Ngày_22_01_2026"
+        }
+      ]
+    },
+    {
+      "username": "Son@1235",
+      "display_name": "Nguyễn Hoàng Sơn",
+      "hashed_password": "JDJiJDEyJFhSLkVFdjU4SEd3ZmVrSlVtL1Q3MGVGeGJtcGd4Sjk2QzBPWXJkQkROQi4xL1FTa25FWmdl",
+      "sheets_config": [
+        {
+          "domain": "DR",
+          "sheet_id": "1gIIXt6fC9lXR2vRhnrLJxBoIT2pIvgNfPP8Ct96_D6k",
+          "worksheet": "Ngày_22_01_2026"
+        }
+      ]
     }
   ]
 }

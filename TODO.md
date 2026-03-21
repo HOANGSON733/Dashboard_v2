@@ -1,24 +1,14 @@
-# Fix JSONDecodeError in users.json
+# TODO Progress: Add Back Button to Profile Page
 
-## Information Gathered
-- users.json is corrupted/truncated at line ~14: incomplete second user "Son@1234" after "hashed_password": 
-- First user "Son@123" is valid with domains ["drtuananh.com", "huyenhocviet.com", "sdtc.vn"]
-- user_auth.py load_users() lacks error handling, crashes on invalid JSON
-- pages/auth.py calls register_user() -> load_users() -> error
+## Completed Steps
+- [x] Create TODO.md with plan breakdown
+- [x] Add back button to pages/profile.py
 
-## Plan
-1. Repair users.json: Complete/validate JSON keeping only valid "Son@123" user (remove incomplete "Son@1234")
-2. Add try/except in user_auth.py load_users(): return [] on JSON error, optionally auto-repair
-3. Test auth.py after fixes
+## Completed Steps
+- [x] Create TODO.md with plan breakdown
+- [x] Add back button to pages/profile.py
+- [x] Test navigation (app running)
 
-## Dependent Files
-- users.json (repair)
-- user_auth.py (add error handling)
+**Status**: Task hoàn thành! Nút back đã thêm thành công vào trang profile.
 
-## Followup steps
-- Test streamlit run pages/auth.py
-- Test register new user
-- Test login with "Son@123"
-
-Approve this plan to proceed?
 

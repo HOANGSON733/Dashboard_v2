@@ -16,7 +16,8 @@ def save_session_state():
     session_file = f"dashboard_session_{user_id}.json"
     session_data = {
         'user_id': st.session_state.get('user_id'),
-        'user_domains': st.session_state.get('user_domains', []),
+        'user_sheets_config': st.session_state.get('user_sheets_config', []),
+        'selected_domain': st.session_state.get('selected_domain', ''),
         'goals': {},
         'snapshots': {},
         'saved_filters': st.session_state.get('saved_filters', {}),
@@ -72,7 +73,7 @@ def save_session_state():
     # Also save default bridge file
     default_data = {
         'user_id': st.session_state.get('user_id'),
-        'user_domains': st.session_state.get('user_domains', [])
+        'user_sheets_config': st.session_state.get('user_sheets_config', [])
     }
     with open('dashboard_session_default.json', 'w', encoding='utf-8') as f:
         json.dump(default_data, f, ensure_ascii=False, indent=2)
@@ -85,8 +86,8 @@ def save_session_state():
 
 
 # ===================== LOAD SESSION STATE =====================
-def load_session_state():
-    """Tải session state từ file JSON"""
+def load_session_state(restore_auth=True):
+    """Tải session state từ file JSON. restore_auth=False skips auth restoration."""
     import pandas as pd
     # Try to load with default first, then restore user_id if valid
     session_file = "dashboard_session_default.json"
@@ -97,7 +98,7 @@ def load_session_state():
             with open(session_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 saved_user_id = data.get('user_id')
-                if saved_user_id:
+                if saved_user_id and restore_auth:
                     # Load full session for this user
                     user_session_file = f"dashboard_session_{saved_user_id}.json"
                     if os.path.exists(user_session_file):
@@ -113,12 +114,13 @@ def load_session_state():
     else:
         return {}
     
-    # Restore auth state first
-    if saved_user_id:
+    # ONLY restore auth if explicitly allowed
+    if restore_auth and saved_user_id and 'user_id' not in st.session_state:
         st.session_state.user_id = saved_user_id
-        st.session_state.user_domains = session_data.get('user_domains', [])
+        st.session_state.user_sheets_config = session_data.get('user_sheets_config', [])
+
     
-    # Convert string dates back to datetime objects for other data
+    # Convert string dates back to datetime objects for other data (always)
     if 'goals' in session_data:
         for goal_id, goal in session_data['goals'].items():
             if 'deadline' in goal and isinstance(goal['deadline'], str):
@@ -158,20 +160,39 @@ def load_session_state():
     
     return session_data
 
+def load_app_data_only():
+    """Load app data (goals/snapshots) WITHOUT restoring auth state"""
+    return load_session_state(restore_auth=False)
+
 
 # ===================== INITIALIZE SESSION STATE =====================
-def init_session_state():
-    """Khởi tạo session state"""
-    # Load saved session (sets user_id/user_domains if available)
-    saved_session = load_session_state()
+def clear_all_session_files():
+    """Clear ALL session files on logout - enhanced"""
+    import glob
+    # Delete all dashboard_session_*.json files
+    session_files = glob.glob("dashboard_session_*.json")
+    session_files.append("dashboard_session_default.json")
+    for f in session_files:
+        if os.path.exists(f):
+            try:
+                os.remove(f)
+                print(f"Deleted {f}")
+            except Exception as e:
+                print(f"Failed to delete {f}: {e}")
+
+def init_session_state(restore_auth=True):
+    """Khởi tạo session state. restore_auth=True only after login confirmed."""
+    saved_session = load_session_state(restore_auth=restore_auth)
     
-    # Initialize other session state with saved data
+    # Initialize app data (safe always)
     if 'goals' not in st.session_state:
         st.session_state.goals = saved_session.get('goals', {})
     if 'snapshots' not in st.session_state:
         st.session_state.snapshots = saved_session.get('snapshots', {})
     if 'saved_filters' not in st.session_state:
         st.session_state.saved_filters = saved_session.get('saved_filters', {})
+    if 'selected_domain' not in st.session_state:
+        st.session_state.selected_domain = saved_session.get('selected_domain', '')
     if 'theme' not in st.session_state:
         st.session_state.theme = saved_session.get('theme', 'dark').lower()
     if 'notes' not in st.session_state:

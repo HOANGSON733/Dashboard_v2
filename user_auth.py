@@ -6,7 +6,9 @@ import bcrypt
 USERS_FILE = 'users.json'
 
 def load_users():
-    """Load users from JSON file."""
+    """
+    Load users from JSON file.
+    """
     if os.path.exists(USERS_FILE):
         try:
             with open(USERS_FILE, 'r', encoding='utf-8') as f:
@@ -18,17 +20,23 @@ def load_users():
     return []
 
 def save_users(users):
-    """Save users to JSON file."""
+    """
+    Save users to JSON file.
+    """
     data = {'users': users}
     with open(USERS_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def hash_password(password):
-    """Hash password using bcrypt."""
+    """
+    Hash password using bcrypt.
+    """
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
 def verify_password(password, hashed):
-    """Verify password against hash."""
+    """
+    Verify password against hash.
+    """
     try:
         import base64
         return bcrypt.checkpw(password.encode('utf-8'), base64.b64decode(hashed))
@@ -36,54 +44,126 @@ def verify_password(password, hashed):
         # Legacy direct str hash
         return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-def register_user(username, password, domains):
-    """Register new user. Returns True if successful."""
+def register_user(username, password, display_name, sheets_config):
+    """
+    Register new user. sheets_config is list of {'domain':str, 'sheet_id':str, 'worksheet':str}. Returns True if successful.
+    """
     users = load_users()
     if any(u['username'] == username for u in users):
         return False, "Username already exists"
+    if len(display_name.strip()) < 2:
+        return False, "Họ và tên quá ngắn"
     hashed_pw = hash_password(password)
     import base64
     user = {
         'username': username,
+        'display_name': display_name.strip(),
         'hashed_password': base64.b64encode(hashed_pw).decode('ascii'),
-        'domains': domains  # list of domain names
+        'sheets_config': sheets_config  # list of dicts
     }
     users.append(user)
     save_users(users)
     return True, "Registered successfully"
 
 def login_user(username, password):
-    """Login user. Returns (success, domains) or (False, error)."""
+    """
+    Login user. Returns (success, user_data dict) or (False, error).
+    """
     users = load_users()
     for user in users:
         if user['username'] == username and verify_password(password, user['hashed_password']):
-            return True, user['domains']
+            user_data = {
+                'sheets_config': user.get('sheets_config', []),
+                'display_name': user.get('display_name', username)
+            }
+            return True, user_data
     return False, "Invalid username or password"
 
+def update_user(username, new_display_name, new_sheets_config, old_password=None, new_password=None):
+    """
+    Update user profile. Returns (success, msg). Verifies old_password if changing password.
+    """
+    users = load_users()
+    user_idx = None
+    for i, u in enumerate(users):
+        if u['username'] == username:
+            user_idx = i
+            break
+
+    if user_idx is None:
+        return False, "User not found"
+
+    user = users[user_idx]
+
+    # Validate display_name
+    if len(new_display_name.strip()) < 2:
+        return False, "Họ và tên quá ngắn"
+
+    # Validate sheets_config
+    for config in new_sheets_config:
+        if not all(k in config for k in ['domain', 'sheet_id', 'worksheet']):
+            return False, "Mỗi domain phải có domain, sheet_id, worksheet"
+        if not config['domain'].strip():
+            return False, "Tên domain không được rỗng"
+
+    # Update display_name and sheets_config always
+    user['display_name'] = new_display_name.strip()
+    user['sheets_config'] = new_sheets_config
+
+    # Password change (optional)
+    if new_password is not None:
+        if not old_password:
+            return False, "Phải nhập mật khẩu cũ để thay đổi"
+        if not verify_password(old_password, user['hashed_password']):
+            return False, "Mật khẩu cũ không đúng"
+        hashed_new = hash_password(new_password)
+        import base64
+        user['hashed_password'] = base64.b64encode(hashed_new).decode('ascii')
+
+    save_users(users)
+    return True, "Cập nhật thành công"
+
 def logout():
-    """Logout current user."""
+    """
+    Logout current user - FIXED.
+    """
+    # Clear ALL persistent session files
+    try:
+        import persistence
+        persistence.clear_all_session_files()
+    except ImportError:
+        pass
+    # Clear session state
     if 'user_id' in st.session_state:
         del st.session_state['user_id']
+    if 'user_sheets_config' in st.session_state:
+        del st.session_state['user_sheets_config']
     if 'user_domains' in st.session_state:
         del st.session_state['user_domains']
 
 def get_user_domains():
-    """Get current user's domains from session."""
-    return st.session_state.get('user_domains', [])
+    """
+    Get current user's domains from session.
+    """
+    config = st.session_state.get('user_sheets_config', [])
+    return [c['domain'] for c in config]
 
 def is_authenticated():
-    """Check if user is logged in."""
+    """
+    Check if user is logged in.
+    """
     return 'user_id' in st.session_state
 
-
 def validate_session():
-    """Validate if session user/domains match users.json"""
-    if 'user_id' not in st.session_state or not st.session_state.get('user_domains'):
+    """
+    Validate session for dashboard access (refresh-safe)
+    """
+    if 'user_id' not in st.session_state:
         return False
     
     users = load_users()
     for user in users:
-        if (user['username'] == st.session_state.user_id and 
-            user['domains'] == st.session_state.user_domains):
+        if user['username'] == st.session_state.user_id:
             return True
     return False
+

@@ -9,11 +9,11 @@ import pandas as pd
 from datetime import datetime
 
 # Import modules
-from config import setup_page_config, get_current_theme, get_custom_css, ANALYSIS_MODES
+from config import setup_page_config, get_custom_css, ANALYSIS_MODES
 from auth import init_sheets_client
-from persistence import save_session_state, init_session_state
+from persistence import save_session_state, init_session_state, clear_all_session_files
 from data_loader import load_sheet_data_cached, get_available_days, apply_filters, get_date_range_days
-from sheets_config import SHEETS
+# from sheets_config import SHEETS  # Removed: now per-user
 
 # Import UI modules
 from ui_tongquan import render_tongquan
@@ -27,21 +27,22 @@ from ui_snapshots import render_snapshots
 from ui_lichnhiet import render_lichnhiet
 from ui_ga import render_ga_ui
 
-
-
-
-
 # ===================== INITIALIZE =====================
 setup_page_config()
-init_session_state()  # Loads user_id/user_domains from persistent storage
 
-# Apply custom CSS
 st.markdown(get_custom_css(), unsafe_allow_html=True)
 
-# Auth validation - full check
+# Restore session FIRST (auth + data)
+init_session_state(restore_auth=True)
+
+# Auth check AFTER full restore
 import user_auth
 if not user_auth.validate_session():
     st.switch_page("pages/auth.py")
+
+# col_left, col_right = st.columns([4,1])
+# with col_right:
+#     st.page_link("pages/profile.py", label="👤 Profile", icon="👤")
 
 # Encode logo once at startup (used in both header and sidebar)
 import base64
@@ -50,82 +51,126 @@ try:
 except:
     logo_base64 = None
 
-else:
-    st.markdown("""
-        <div style='text-align: left; margin: 0; padding: 0;'>
-            <h1 style='font-size: 2.5rem; font-weight: 800; margin: 0; padding: 0;'>SEO Rank</h1>
-            <p style='font-size: 1rem; opacity: 0.7; margin: 0; padding: 0;'>Phân tích SEO toàn diện với AI Insights & Forecasting</p>
-        </div>
-    """, unsafe_allow_html=True)
+# Sidebar toggle state
+if 'sidebar_collapsed' not in st.session_state:
+    st.session_state.sidebar_collapsed = False
 
+def toggle_sidebar():
+    st.session_state.sidebar_collapsed = not st.session_state.sidebar_collapsed
+    # Rerun to apply CSS change
+    st.rerun()
 
-
-
-# ===================== SIDEBAR =====================
-# Encode logo for sidebar (reuse the one already loaded)
-try:
-    if logo_base64 is None:
-        logo_base64 = base64.b64encode(open('logo.png', 'rb').read()).decode()
+if logo_base64:
     st.sidebar.markdown(f"""
         <style>
             [data-testid="stSidebar"] > div:first-child {{ padding-top: 0rem !important; }}
             .sidebar-logo {{ 
                 display: flex; 
                 justify-content: center; 
-                transform: translateY(-40px);
+                transform: translateY(0px);
             }}
             .sidebar-logo img {{
                 width: 180px;
                 border-radius: 12px;
-                
+            }}
+            /* Hide nav links */
+            [data-testid="stSidebar"] nav a[href*="/pages/auth"], 
+            [data-testid="stSidebar"] nav a[href="/dashboard"],
+            [data-testid="stSidebarNav"] {{
+                display: none !important;
             }}
         </style>
         <div class='sidebar-logo'>
             <img src='data:image/png;base64,{logo_base64}' alt='Logo'>
         </div>
     """, unsafe_allow_html=True)
-except Exception as e:
-    st.sidebar.error(f"Logo error: {e}")
 
-st.sidebar.markdown("---")
-if st.sidebar.button("🚪 Đăng xuất"):
-    if 'user_id' in st.session_state:
-        del st.session_state['user_id']
-    if 'user_domains' in st.session_state:
-        del st.session_state['user_domains']
-    st.switch_page("pages/auth.py")
+# Sidebar toggle CSS + hide when collapsed (moved here to work properly)
+st.markdown(f"""
+<style>
+    /* Sidebar toggle button style */
+    #sidebar-toggle-btn {{
+        width: 100% !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        margin-bottom: 1rem !important;
+        padding: 10px !important;
+        background: #3b82f6 !important;
+        color: white !important;
+        border: none !important;
+    }}
+    #sidebar-toggle-btn:hover {{
+        background: #2563eb !important;
+    }}
+    
+    section[data-testid="stSidebar"] > div > div {{
+        transition: all 0.3s ease !important;
+    }}
+    
+    /* Hide sidebar content when collapsed - applied globally */
+"""
++ (""".main-content {{ margin-left: 0 !important; }}""" if st.session_state.sidebar_collapsed else "")
++ """
+    section[data-testid="stSidebar"] {{
+        """ + ("display: none !important;" if st.session_state.sidebar_collapsed else "width: 22rem !important;") + """
+    }}
+</style>
+""", unsafe_allow_html=True)
 
-# Domain selector
-user_domains = st.session_state.get('user_domains', [])
-available_domains = [d for d in SHEETS.keys() if d in user_domains]
-if not available_domains:
-    st.error("❌ Không có domain nào được phép truy cập")
-    st.stop()
-domains = available_domains
-st.sidebar.markdown("**🌐 Domain**")
-selected_domain = st.sidebar.selectbox("🌐 Domain", domains, label_visibility="collapsed")
-st.session_state.selected_domain = selected_domain
-sheet_id = SHEETS[selected_domain]["sheet_id"]
+col_left, col_right = st.columns([4,1])
+with col_left:
+    st.markdown("""
+        <div style='text-align: left; margin: 0; padding: 0;'>
+            <h1 style='font-size: 2.5rem; font-weight: 800; margin: 0; padding: 0;'>SEO Rank</h1>
+            <p style='font-size: 1rem; opacity: 0.7; margin: 0; padding: 0;'>Phân tích SEO toàn diện với AI Insights & Forecasting</p>
+        </div>
+    """, unsafe_allow_html=True)
+with col_right:
+    st.page_link("pages/profile.py", label="Profile", icon="👤")
 
-# Theme selector
-st.sidebar.markdown("**🎨 Giao diện**")
-selected_theme = st.sidebar.selectbox("Chế độ", options=['light', 'dark'], index=0 if st.session_state.theme == 'light' else 1, label_visibility="collapsed")
-if selected_theme != st.session_state.theme:
-    st.session_state.theme = selected_theme
-    save_session_state()
-    st.rerun()
+# ===================== SIDEBAR =====================
+if 'user_id' in st.session_state:
+    # Only render sidebar for authenticated users
+    st.sidebar.markdown("---")
 
-# Load data
-client = init_sheets_client()
-sheet_map = get_available_days(sheet_id, client)
+    # if st.sidebar.button("🚪 Đăng xuất"):
+    #     # FIXED: Proper logout with full session clear
+    #     clear_all_session_files()
+    #     if 'user_id' in st.session_state:
+    #         del st.session_state['user_id']
+    #     if 'user_domains' in st.session_state:
+    #         del st.session_state['user_domains']
+    #     # st.switch_page("pages/auth.py")
 
-if not sheet_map:
-    st.error("❌ Không tìm thấy worksheet dạng Ngày_DD_MM_YYYY")
-    st.stop()
+    # Domain selector
+    user_sheets_config = st.session_state.get('user_sheets_config', [])
+    domains = [cfg['domain'] for cfg in user_sheets_config]
+    if not domains:
+        st.error("❌ Không có domain nào được phép truy cập")
+        st.stop()
+    st.sidebar.markdown("**🌐 Domain**")
+    selected_domain = st.sidebar.selectbox("🌐 Domain", domains, label_visibility="collapsed")
+    st.session_state.selected_domain = selected_domain
+    
+    # Get sheet config for selected domain
+    selected_config = next((cfg for cfg in user_sheets_config if cfg['domain'] == selected_domain), None)
+    if not selected_config:
+        st.error(f"❌ Không tìm thấy config cho domain {selected_domain}")
+        st.stop()
+    sheet_id = selected_config['sheet_id']
+
+    # Load data early for filters
+    client = init_sheets_client()
+    sheet_map = get_available_days(sheet_id, client)
+    
+    if not sheet_map:
+        st.error("❌ Không tìm thấy worksheet dạng Ngày_DD_MM_YYYY")
+        st.stop()
 
 # Filter configuration
 st.sidebar.markdown("**💾 Bộ lọc đã lưu**")
-if st.session_state.saved_filters:
+if 'saved_filters' in st.session_state and st.session_state.saved_filters:
     filter_names = list(st.session_state.saved_filters.keys())
     selected_saved_filter = st.sidebar.selectbox("Chọn bộ lọc", ["Mới"] + filter_names)
     if selected_saved_filter != "Mới":
@@ -138,13 +183,13 @@ if st.session_state.saved_filters:
         keyword_filter_default = ""
         rank_limit_default = 100
 else:
-    selected_days = [list(sheet_map.keys())[-1]]
+    selected_days = [list(sheet_map.keys())[-1]] if 'sheet_map' in locals() else []
     keyword_filter_default = ""
     rank_limit_default = 100
 
 # Quick selection
 max_days = 30
-total_available_days = len(sheet_map)
+total_available_days = len(sheet_map) if 'sheet_map' in locals() else 0
 
 if total_available_days > max_days:
     st.sidebar.warning(f"⚠️ Có {total_available_days} ngày dữ liệu. Khuyến nghị chọn ≤ {max_days} ngày.")
@@ -163,7 +208,7 @@ if total_available_days > max_days:
 st.sidebar.markdown("**📅 Chọn khoảng thời gian**")
 use_date_range = st.sidebar.checkbox("Sử dụng bộ chọn khoảng", value=False)
 
-if use_date_range:
+if use_date_range and 'sheet_map' in locals():
     col_start, col_end = st.sidebar.columns(2)
     with col_start:
         start_date = st.date_input("Từ ngày", value=min(sheet_map.values()), min_value=min(sheet_map.values()), max_value=max(sheet_map.values()))
@@ -175,7 +220,8 @@ if use_date_range:
             selected_days = range_days
             st.sidebar.success(f"✅ Đã chọn {len(selected_days)} ngày")
 else:
-    selected_days = st.sidebar.multiselect("📅 Chọn ngày", options=list(sheet_map.keys()), default=selected_days, max_selections=50)
+    if 'sheet_map' in locals():
+        selected_days = st.sidebar.multiselect("📅 Chọn ngày", options=list(sheet_map.keys()), default=selected_days, max_selections=50)
 
 if not selected_days:
     st.warning("⚠️ Vui lòng chọn ít nhất một ngày")
@@ -204,25 +250,34 @@ with st.sidebar.expander("🔍 Bộ lọc nâng cao", expanded=False):
     filter_name = st.text_input("Tên bộ lọc", placeholder="VD: Top 10 only")
     if st.button("💾 Lưu bộ lọc"):
         if filter_name:
+            if 'saved_filters' not in st.session_state:
+                st.session_state.saved_filters = {}
             st.session_state.saved_filters[filter_name] = {"days": selected_days, "keyword": keyword_filter, "rank_limit": rank_limit}
             save_session_state()
             st.success(f"✅ Đã lưu bộ lọc '{filter_name}'")
         else:
             st.error("Vui lòng nhập tên bộ lọc")
 
-
 # ===================== LOAD SHEET DATA =====================
-df, sheet_map = load_sheet_data_cached(client, sheet_id, selected_days)
+# If not authenticated, skip data load
+if 'user_id' in st.session_state:
+    df, sheet_map = load_sheet_data_cached(client, sheet_id, selected_days)
 
-if df is None:
-    st.warning("⚠️ Không có dữ liệu")
-    st.stop()
+    if df is None or df.empty:
+        st.warning("⚠️ Không có dữ liệu")
+        st.stop()
 
-# Apply filters
-filtered = apply_filters(df, keyword_filter, rank_limit, only_no_rank, only_with_rank)
-
-
-
+    # Apply filters
+    filtered = apply_filters(df, keyword_filter, rank_limit, only_no_rank, only_with_rank)
+else:
+    df = pd.DataFrame()
+    filtered = pd.DataFrame()
+    sheet_map = {}
+    selected_days = []
+    keyword_filter = ""
+    rank_limit = 100
+    only_no_rank = False
+    only_with_rank = False
 
 # ===================== RENDER MODES =====================
 MODE_DISPATCH = {
@@ -232,18 +287,16 @@ MODE_DISPATCH = {
     "Phân tích URL": lambda: render_url(filtered, df),
     "Nhóm từ khóa": lambda: render_nhomkeyword(filtered),
     "Mục tiêu": lambda: render_muctieu(filtered),
-"Dự báo": lambda: render_dubao(df),
-"Snapshots": lambda: render_snapshots(),
-"Lịch nhiệt": lambda: render_lichnhiet(df),
-"Google Analytics": lambda: render_ga_ui(filtered, df),
+    "Dự báo": lambda: render_dubao(df),
+    "Snapshots": lambda: render_snapshots(),
+    "Lịch nhiệt": lambda: render_lichnhiet(df),
+    "Google Analytics": lambda: render_ga_ui(filtered, df),
 }
 
 if analysis_mode in MODE_DISPATCH:
     MODE_DISPATCH[analysis_mode]()
 else:
     st.error(f"❌ Chế độ '{analysis_mode}' chưa được implement")
-
-
 
 # ===================== DATA TABLE =====================
 st.markdown('<p class="section-header">📄 Bảng dữ liệu chi tiết</p>', unsafe_allow_html=True)
@@ -271,4 +324,7 @@ st.download_button(
     file_name=f"seo_data_{selected_domain}_{datetime.now().strftime('%Y%m%d')}.csv",
     mime="text/csv"
 )
+
+# Auto-save session on interaction
+save_session_state()
 
