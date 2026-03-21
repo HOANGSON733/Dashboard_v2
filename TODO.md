@@ -1,14 +1,10 @@
-# TODO Progress: Add Back Button to Profile Page
+# TODO - ADD LOGO.PNG
 
-## Completed Steps
-- [x] Create TODO.md with plan breakdown
-- [x] Add back button to pages/profile.py
+## COMPLETED:\n- [x] 1. Created new logo.png (512x512 PNG, blue "SR" icon matching theme)\n- [ ] 2. Test in pages/auth.py and dashboard.py
 
-## Completed Steps
-- [x] Create TODO.md with plan breakdown
-- [x] Add back button to pages/profile.py
-- [x] Test navigation (app running)
+## REMAINING:
+- [ ] 2. Test in pages/auth.py and dashboard.py 
+- [ ] 3. Complete task
 
-**Status**: Task hoàn thành! Nút back đã thêm thành công vào trang profile.
-
+Run: `streamlit run pages/auth.py` to verify logo displays correctly.
 
