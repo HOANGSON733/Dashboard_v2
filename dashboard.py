@@ -32,13 +32,28 @@ setup_page_config()
 
 st.markdown(get_custom_css(), unsafe_allow_html=True)
 
-# Restore session FIRST (auth + data)
+# Restore session FIRST (auth + data) - SAFE avatar handling
 init_session_state(restore_auth=True)
 
-# Auth check AFTER full restore
+# ✅ Ensure avatar is cleared if no auth
+if not hasattr(st.session_state, 'user_id') or 'user_id' not in st.session_state:
+    if 'avatar' in st.session_state:
+        del st.session_state['avatar']
+
+# ✅ ROBUST AUTH VALIDATION BEFORE domain check (F5 fix)
 import user_auth
 if not user_auth.validate_session():
     st.switch_page("pages/auth.py")
+
+# ✅ AUTO-RESTORE user_sheets_config if missing after validate (F5 safe)
+if 'user_id' in st.session_state and 'user_sheets_config' not in st.session_state:
+    from user_auth import load_users
+    users = load_users()
+    for user in users:
+        if user['username'] == st.session_state.user_id:
+            st.session_state.user_sheets_config = user.get('sheets_config', [])
+            st.session_state.display_name = user.get('display_name', st.session_state.user_id)
+            break
 
 # col_left, col_right = st.columns([4,1])
 # with col_right:
@@ -63,11 +78,11 @@ def toggle_sidebar():
 if logo_base64:
     st.sidebar.markdown(f"""
         <style>
-            [data-testid="stSidebar"] > div:first-child {{ padding-top: 0rem !important; }}
+            [data-testid="stSidebar"] > div:first-child {{ padding-top: 0rem !important;margin-bottom: -10rem !important; }}
             .sidebar-logo {{ 
                 display: flex; 
                 justify-content: center; 
-                transform: translateY(0px);
+                transform: translateY(-50px);
             }}
             .sidebar-logo img {{
                 width: 180px;
@@ -94,7 +109,7 @@ st.markdown(f"""
         border-radius: 12px !important;
         font-weight: 600 !important;
         font-size: 14px !important;
-        margin-bottom: 1rem !important;
+        margin-bottom: 0rem !important;
         padding: 10px !important;
         background: #3b82f6 !important;
         color: white !important;
@@ -132,7 +147,7 @@ with col_right:
 # ===================== SIDEBAR =====================
 if 'user_id' in st.session_state:
     # Only render sidebar for authenticated users
-    st.sidebar.markdown("---")
+    # st.sidebar.markdown("---")
 
     # if st.sidebar.button("🚪 Đăng xuất"):
     #     # FIXED: Proper logout with full session clear

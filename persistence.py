@@ -22,7 +22,9 @@ def save_session_state():
         'snapshots': {},
         'saved_filters': st.session_state.get('saved_filters', {}),
         'theme': st.session_state.get('theme', 'dark'),
-        'notes': st.session_state.get('notes', {})
+        'notes': st.session_state.get('notes', {}),
+        'display_name': st.session_state.get('display_name', ''),
+        'avatar': st.session_state.get('avatar', None),
     }
     
     # Convert goals (which may contain date objects) into serializable form
@@ -87,42 +89,87 @@ def save_session_state():
 
 # ===================== LOAD SESSION STATE =====================
 def load_session_state(restore_auth=True):
-    """Tải session state từ file JSON. restore_auth=False skips auth restoration."""
+    """Tải session state từ file JSON w/ ROBUST F5-safe validation. restore_auth=False skips auth."""
     import pandas as pd
-    # Try to load with default first, then restore user_id if valid
+    from user_auth import load_users
+    
+# FIXED: Selective clear - ONLY on corruption (F5-safe)
+    def force_clear_session():
+        """Helper: Clear ONLY corrupted app data, KEEP auth"""
+        keys_to_clear = ['goals', 'snapshots', 'saved_filters', 'selected_domain']
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+    
+    # Always start with default
     session_file = "dashboard_session_default.json"
-    saved_user_id = None
+    data = {}
     
     if os.path.exists(session_file):
         try:
             with open(session_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                saved_user_id = data.get('user_id')
-                if saved_user_id and restore_auth:
-                    # Load full session for this user
-                    user_session_file = f"dashboard_session_{saved_user_id}.json"
-                    if os.path.exists(user_session_file):
-                        with open(user_session_file, 'r', encoding='utf-8') as f:
-                            session_data = json.load(f)
-                    else:
-                        session_data = data
-                else:
-                    session_data = data
         except Exception as e:
-            st.warning(f"⚠️ Không thể tải session default: {e}")
+            st.warning(f"⚠️ Corrupted default session: {e} → Fresh start")
+            force_clear_session()
             return {}
-    else:
-        return {}
     
-    # ONLY restore auth if explicitly allowed
-    if restore_auth and saved_user_id and 'user_id' not in st.session_state:
-        st.session_state.user_id = saved_user_id
-        st.session_state.user_sheets_config = session_data.get('user_sheets_config', [])
+    # 🔒 CRITICAL F5-SAFE VALIDATION
+    saved_user_id = data.get('user_id')
+    current_user_id = st.session_state.get('user_id')
+    
+    # Case 1: No saved user → empty session OK
+    if not saved_user_id:
+        return data
+    
+    # Case 2: FIXED MISMATCH - don't clear auth, just skip user session
+    if current_user_id and saved_user_id != current_user_id:
+        st.info("ℹ️ User session mismatch - using current session")
+        # Keep current_user_id + load app data only
+        return {'user_id': current_user_id}
+    
+    # Case 3: Restore user session + VALIDATE user exists
+    if saved_user_id and restore_auth:
+        user_session_file = f"dashboard_session_{saved_user_id}.json"
+        if os.path.exists(user_session_file):
+            try:
+                with open(user_session_file, 'r', encoding='utf-8') as f:
+                    session_data = json.load(f)
+                
+                # ✅ Validate: user_id exists in users.json
+                users = load_users()
+                if not any(u['username'] == saved_user_id for u in users):
+                    st.warning(f"⚠️ User {saved_user_id} missing → Auto-recovery from users.json")
+                    # FALLBACK: reload user config from users.json
+                    for user in users:
+                        if user['username'] == current_user_id or user['username'] == saved_user_id:
+                            session_data.update({
+                                'user_id': user['username'],
+                                'user_sheets_config': user.get('sheets_config', []),
+                                'display_name': user.get('display_name', user['username']),
+                                'avatar': user.get('avatar')
+                            })
+                            break
+                    else:
+                        force_clear_session()
+                        return {}
+                    return session_data
+                
+                # Session valid → set user_id early for downstream
+                if 'user_id' not in st.session_state:
+                    st.session_state.user_id = saved_user_id
+                return session_data
+            except Exception as e:
+                st.warning(f"⚠️ Corrupted user session {user_session_file}: {e} → Fresh start")
+                force_clear_session()
+                return {}
+    
+    return data
 
     
     # Convert string dates back to datetime objects for other data (always)
-    if 'goals' in session_data:
-        for goal_id, goal in session_data['goals'].items():
+    if 'goals' in data:
+        for goal_id, goal in data['goals'].items():
             if 'deadline' in goal and isinstance(goal['deadline'], str):
                 try:
                     goal['deadline'] = datetime.fromisoformat(goal['deadline']).date()
@@ -182,6 +229,23 @@ def clear_all_session_files():
 
 def init_session_state(restore_auth=True):
     """Khởi tạo session state. restore_auth=True only after login confirmed."""
+    # Always initialize avatar safely first
+    if 'avatar' not in st.session_state:
+        st.session_state.avatar = None
+    elif restore_auth and st.session_state.get('user_id'):
+        saved_session = load_session_state(restore_auth=restore_auth)
+        # 🔒 CRITICAL: Validate user_id before restoring avatar
+        saved_user_id = saved_session.get('user_id')
+        if saved_user_id != st.session_state.user_id:
+            st.warning("⚠️ Session mismatch - clearing stale avatar")
+            st.session_state.avatar = None
+            st.rerun()
+        else:
+            st.session_state.avatar = saved_session.get('avatar', None)
+    else:
+        # No auth or explicit clear
+        st.session_state.avatar = None
+    
     saved_session = load_session_state(restore_auth=restore_auth)
     
     # Initialize app data (safe always)
@@ -197,4 +261,6 @@ def init_session_state(restore_auth=True):
         st.session_state.theme = saved_session.get('theme', 'dark').lower()
     if 'notes' not in st.session_state:
         st.session_state.notes = saved_session.get('notes', {})
+    if 'display_name' not in st.session_state:
+        st.session_state.display_name = saved_session.get('display_name', st.session_state.get('user_id', ''))
 

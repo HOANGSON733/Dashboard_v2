@@ -66,25 +66,26 @@ def register_user(username, password, display_name, sheets_config):
     return True, "Registered successfully"
 
 def login_user(username, password):
-    """
-    Login user. Returns (success, user_data dict) or (False, error).
-    """
     users = load_users()
     for user in users:
         if user['username'] == username and verify_password(password, user['hashed_password']):
             user_data = {
                 'sheets_config': user.get('sheets_config', []),
-                'display_name': user.get('display_name', username)
+                'display_name': user.get('display_name', username),
+                'avatar': user.get('avatar')
             }
+            # ✅ Explicit avatar set - prevents stale
+            st.session_state.avatar = user_data['avatar']
             return True, user_data
     return False, "Invalid username or password"
 
-def update_user(username, new_display_name, new_sheets_config, old_password=None, new_password=None):
+def update_user(username, new_display_name, new_sheets_config, avatar=None, old_password=None, new_password=None):
     """
-    Update user profile. Returns (success, msg). Verifies old_password if changing password.
+    Update user profile. Returns (success, msg).
     """
     users = load_users()
     user_idx = None
+
     for i, u in enumerate(users):
         if u['username'] == username:
             user_idx = i
@@ -106,16 +107,21 @@ def update_user(username, new_display_name, new_sheets_config, old_password=None
         if not config['domain'].strip():
             return False, "Tên domain không được rỗng"
 
-    # Update display_name and sheets_config always
+    # ✅ Update info
     user['display_name'] = new_display_name.strip()
     user['sheets_config'] = new_sheets_config
 
-    # Password change (optional)
+    # ✅ NEW: lưu avatar
+    if avatar is not None:
+        user['avatar'] = avatar
+
+    # Password change
     if new_password is not None:
         if not old_password:
             return False, "Phải nhập mật khẩu cũ để thay đổi"
         if not verify_password(old_password, user['hashed_password']):
             return False, "Mật khẩu cũ không đúng"
+
         hashed_new = hash_password(new_password)
         import base64
         user['hashed_password'] = base64.b64encode(hashed_new).decode('ascii')
@@ -140,6 +146,9 @@ def logout():
         del st.session_state['user_sheets_config']
     if 'user_domains' in st.session_state:
         del st.session_state['user_domains']
+    # ✅ Clear avatar explicitly
+    if 'avatar' in st.session_state:
+        del st.session_state['avatar']
 
 def get_user_domains():
     """
@@ -156,7 +165,7 @@ def is_authenticated():
 
 def validate_session():
     """
-    Validate session for dashboard access (refresh-safe)
+    Validate session w/ AUTO-RECOVERY (F5-safe enhancement)
     """
     if 'user_id' not in st.session_state:
         return False
@@ -164,6 +173,13 @@ def validate_session():
     users = load_users()
     for user in users:
         if user['username'] == st.session_state.user_id:
+            # ✅ AUTO-RESTORE missing config (F5 safe)
+            if 'user_sheets_config' not in st.session_state:
+                st.session_state.user_sheets_config = user.get('sheets_config', [])
+            if 'display_name' not in st.session_state:
+                st.session_state.display_name = user.get('display_name', st.session_state.user_id)
+            if 'avatar' not in st.session_state:
+                st.session_state.avatar = user.get('avatar')
             return True
     return False
 

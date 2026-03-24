@@ -1,5 +1,6 @@
 import streamlit as st
 import sys, os
+import base64
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from user_auth import login_user, logout, is_authenticated, update_user
 from config import setup_page_config
@@ -14,14 +15,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Auth check
-if not is_authenticated():
+# Restore session FIRST - F5 SAFE
+from user_auth import validate_session
+init_session_state(restore_auth=True)
+
+# ✅ F5-safe: validate user + restore if valid
+if 'user_id' in st.session_state:
+    if not validate_session():
+        st.session_state.avatar = None
+        st.switch_page("pages/auth.py")
+else:
     st.switch_page("pages/auth.py")
 
 setup_page_config()
 
 st.title("👤 Trang Cá nhân")
-
+if st.session_state.get("avatar"):
+    st.image(
+        f"data:image/png;base64,{st.session_state.avatar}",
+        width=120,
+    )
 col1, col2 = st.columns([1, 3])
 with col1:
     if st.button("⬅️ Quay lại"):
@@ -32,11 +45,45 @@ with col2:
 display_name = st.session_state.get('display_name', st.session_state.user_id)
 user_id = st.session_state.user_id
 
-tab1, tab2, tab3 = st.tabs(["📝 Thông tin cá nhân", "🌐 Quản lý Domain", "🔑 Đổi mật khẩu"])
+tab1, tab2 = st.tabs(["📝 Thông tin cá nhân", "🌐 Quản lý Domain"])
 
 with tab1:
     st.subheader("Họ và tên")
-    new_display_name = st.text_input("Họ và tên mới", value=display_name, help="Nhập họ và tên mới (tối thiểu 2 ký tự)")
+    new_display_name = st.text_input(
+        "Họ và tên mới",
+        value=display_name,
+        help="Nhập họ và tên mới (tối thiểu 2 ký tự)"
+    )
+
+    st.divider()
+
+    # ================= AVATAR =================
+    st.subheader("Ảnh đại diện")
+
+    avatar_file = st.file_uploader(
+        "Tải lên avatar",
+        type=["png", "jpg", "jpeg"],
+        key="avatar_upload"
+    )
+
+    if avatar_file is not None:
+        st.image(avatar_file, width=120, caption="Preview avatar mới")
+
+    # elif st.session_state.get("avatar"):
+    #     st.image(
+    #         f"data:image/png;base64,{st.session_state.avatar}",
+    #         width=120,
+    #         caption="Avatar hiện tại"
+    #     )
+
+    st.divider()
+
+    # ================= PASSWORD =================
+    st.subheader("🔑 Đổi mật khẩu")
+
+    old_password = st.text_input("Mật khẩu cũ", type="password")
+    new_password = st.text_input("Mật khẩu mới", type="password")
+    confirm_password = st.text_input("Xác nhận mật khẩu mới", type="password")
 
 with tab2:
     st.subheader("Quản lý Google Sheets Domain")
@@ -58,27 +105,50 @@ with tab2:
                     "worksheet": worksheet.strip()
                 })
 
-with tab3:
-    st.subheader("Đổi mật khẩu")
-    old_password = st.text_input("Mật khẩu cũ", type="password")
-    new_password = st.text_input("Mật khẩu mới", type="password")
-    confirm_password = st.text_input("Xác nhận mật khẩu mới", type="password")
 
 # Save buttons
 col1, col2 = st.columns([3,1])
 with col1:
     if st.button("💾 Cập nhật thông tin", width='stretch', type="primary"):
-        success, msg = update_user(user_id, new_display_name, new_sheets_config)
+
+        avatar_base64 = st.session_state.get("avatar", None)
+
+        if avatar_file is not None:
+            avatar_base64 = base64.b64encode(avatar_file.read()).decode()
+
+        success, msg = update_user(
+            user_id,
+            new_display_name,
+            new_sheets_config,
+            avatar=avatar_base64   # 👈 thêm dòng này
+        )
+
+        # if success:
+        #     st.session_state.display_name = new_display_name
+        #     st.session_state.user_sheets_config = new_sheets_config
+
+        #     if avatar_base64:
+        #         st.session_state.avatar = avatar_base64
+
+        #     save_session_state()
+        #     # init_session_state(restore_auth=True)
+
+        #     st.success(f"✅ {msg}!")
+        #     st.switch_page("dashboard.py")
+        # else:
+        #     st.error(f"❌ {msg}")
         if success:
-            # Update session
             st.session_state.display_name = new_display_name
             st.session_state.user_sheets_config = new_sheets_config
+
+            if avatar_base64:
+                st.session_state.avatar = avatar_base64
+
             save_session_state()
-            init_session_state(restore_auth=True)
+
             st.success(f"✅ {msg}!")
-            st.switch_page("dashboard.py")
-        else:
-            st.error(f"❌ {msg}")
+
+            st.switch_page("dashboard.py")  # đủ rồi, không cần init lại
 
 with col2:
     if st.button("🔑 Chỉ đổi mật khẩu", width='stretch'):

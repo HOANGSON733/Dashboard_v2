@@ -1,9 +1,27 @@
-# TODO: Replace text logo with logo.png in pages/auth.py
+# TODO: Fix F5 Domain Access Error - Approved Plan
 
-1. ✅ [COMPLETE] Plan approved
-2. ✅ [COMPLETE] Added base64 import and logo_base64 (with try/except like dashboard.py)
-3. ✅ [COMPLETE] Replaced logo-w div with <img src="data:image/png;base64,{logo_base64}" class="logo-img">
-4. ✅ [COMPLETE] Added .logo-img CSS in LEFT_HTML style
-5. ✅ [COMPLETE] Tested (changes applied successfully, logo.png displays in auth page)
-6. ✅ [COMPLETE] Cleaned up anh1.jpg anh2.jpg
-7. ✅ [COMPLETE]
+## ✅ Step 1: Create TODO.md [COMPLETED]
+
+## ✅ Step 2: Update persistence.py
+- Soften validation logic 
+- Add users.json fallback recovery
+- Simplify force_clear_session() [COMPLETED]
+
+## ✅ Step 3: Update dashboard.py  
+- Add robust auth validation BEFORE domain check
+- Auto-restore user_sheets_config if missing
+- Fix init_session_state timing [COMPLETED]
+
+## ✅ Step 4: Enhance user_auth.py
+- Improve validate_session() with auto-recovery [COMPLETED]
+
+## ✅ Step 5: Test & Verify
+```
+✅ Login → F5 → Domain still accessible
+✅ Multi-tab F5 safe  
+✅ Logout clears correctly
+✅ Snapshots/goals persist
+```
+
+## ✅ Step 6: Update TODO.md [COMPLETED]
+
