@@ -23,8 +23,8 @@ def save_session_state():
         'saved_filters': st.session_state.get('saved_filters', {}),
         'theme': st.session_state.get('theme', 'dark'),
         'notes': st.session_state.get('notes', {}),
-        'display_name': st.session_state.get('display_name', ''),
-        'avatar': st.session_state.get('avatar', None),
+'display_name': st.session_state.get('display_name', ''),
+        'avatar_path': st.session_state.get('avatar_path', None),
     }
     
     # Convert goals (which may contain date objects) into serializable form
@@ -147,7 +147,7 @@ def load_session_state(restore_auth=True):
                                 'user_id': user['username'],
                                 'user_sheets_config': user.get('sheets_config', []),
                                 'display_name': user.get('display_name', user['username']),
-                                'avatar': user.get('avatar')
+                                'avatar_path': user.get('avatar_path', user.get('avatar', None))
                             })
                             break
                     else:
@@ -230,8 +230,8 @@ def clear_all_session_files():
 def init_session_state(restore_auth=True):
     """Khởi tạo session state. restore_auth=True only after login confirmed."""
     # Always initialize avatar safely first
-    if 'avatar' not in st.session_state:
-        st.session_state.avatar = None
+    if 'avatar_path' not in st.session_state:
+        st.session_state.avatar_path = None
     elif restore_auth and st.session_state.get('user_id'):
         saved_session = load_session_state(restore_auth=restore_auth)
         # 🔒 CRITICAL: Validate user_id before restoring avatar
@@ -241,10 +241,10 @@ def init_session_state(restore_auth=True):
             st.session_state.avatar = None
             st.rerun()
         else:
-            st.session_state.avatar = saved_session.get('avatar', None)
+            st.session_state.avatar_path = saved_session.get('avatar_path', None)
     else:
         # No auth or explicit clear
-        st.session_state.avatar = None
+        st.session_state.avatar_path = None
     
     saved_session = load_session_state(restore_auth=restore_auth)
     

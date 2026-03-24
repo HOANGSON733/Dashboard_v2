@@ -37,8 +37,8 @@ init_session_state(restore_auth=True)
 
 # ✅ Ensure avatar is cleared if no auth
 if not hasattr(st.session_state, 'user_id') or 'user_id' not in st.session_state:
-    if 'avatar' in st.session_state:
-        del st.session_state['avatar']
+    if 'avatar_path' in st.session_state:
+        del st.session_state['avatar_path']
 
 # ✅ ROBUST AUTH VALIDATION BEFORE domain check (F5 fix)
 import user_auth
@@ -142,8 +142,50 @@ with col_left:
         </div>
     """, unsafe_allow_html=True)
 with col_right:
-    st.page_link("pages/profile.py", label="Profile", icon="👤")
+    import os
 
+    avatar_path = st.session_state.get('avatar_path')
+
+    if avatar_path and os.path.exists(avatar_path):
+        with open(avatar_path, "rb") as f:
+            img_base64 = base64.b64encode(f.read()).decode()
+
+        avatar_html = f"""
+        <a href="/profile" target="_self" style="text-decoration:none;">
+            <img src="data:image/png;base64,{img_base64}" style="
+                width:40px;
+                height:40px;
+                border-radius:50%;
+                object-fit:cover;
+                cursor:pointer;
+                float:right;
+            ">
+        </a>
+        """
+    else:
+        initials = st.session_state.get('display_name', st.session_state.get('user_id', 'U'))[0].upper()
+        avatar_html = f"""
+        <a href="/profile" target="_self" style="text-decoration:none;">
+            <div style="
+                width:40px;
+                height:40px;
+                border-radius:50%;
+                background:#3b82f6;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                color:white;
+                font-weight:600;
+                font-size:16px;
+                cursor:pointer;
+                float:right;
+            ">
+                {initials}
+            </div>
+        </a>
+        """
+
+    st.markdown(avatar_html, unsafe_allow_html=True)
 # ===================== SIDEBAR =====================
 if 'user_id' in st.session_state:
     # Only render sidebar for authenticated users

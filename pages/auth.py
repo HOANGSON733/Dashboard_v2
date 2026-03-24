@@ -383,9 +383,9 @@ with right_col:
                     st.session_state.display_name       = user_config.get("display_name", username)
                     st.session_state.user_sheets_config = user_config["sheets_config"]
                     # ✅ Clear then set avatar post-login
-                    if 'avatar' in st.session_state:
-                        del st.session_state['avatar']
-                    st.session_state.avatar = user_config.get('avatar')
+                    if 'avatar_path' in st.session_state:
+                        del st.session_state['avatar_path']
+                    st.session_state.avatar_path = user_config.get('avatar_path')
                     save_session_state()
                     init_session_state(restore_auth=True)
                     st.success("✅ Đăng nhập thành công!")
@@ -461,9 +461,9 @@ with right_col:
                             st.session_state.display_name       = user_config.get("display_name", new_username)
                             st.session_state.user_sheets_config = user_config["sheets_config"]
                             # ✅ Clear then set avatar post-register
-                            if 'avatar' in st.session_state:
-                                del st.session_state['avatar']
-                            st.session_state.avatar = user_config.get('avatar')
+                            if 'avatar_path' in st.session_state:
+                                del st.session_state['avatar_path']
+                            st.session_state.avatar_path = user_config.get('avatar_path')
                             save_session_state()
                             init_session_state(restore_auth=True)
                             st.success(f"✅ Đăng ký thành công, chào {st.session_state.display_name}!")

@@ -72,10 +72,11 @@ def login_user(username, password):
             user_data = {
                 'sheets_config': user.get('sheets_config', []),
                 'display_name': user.get('display_name', username),
-                'avatar': user.get('avatar')
+'avatar_path': user.get('avatar_path')
             }
             # ✅ Explicit avatar set - prevents stale
-            st.session_state.avatar = user_data['avatar']
+            st.session_state.avatar_path = user_data.get('avatar_path')
+            
             return True, user_data
     return False, "Invalid username or password"
 
@@ -111,9 +112,21 @@ def update_user(username, new_display_name, new_sheets_config, avatar=None, old_
     user['display_name'] = new_display_name.strip()
     user['sheets_config'] = new_sheets_config
 
-    # ✅ NEW: lưu avatar
+    # ✅ NEW: lưu avatar as file
     if avatar is not None:
-        user['avatar'] = avatar
+        os.makedirs('avatars', exist_ok=True)
+        file_path = f'avatars/{username}.png'
+
+        # ✅ CASE 1: upload file (Streamlit UploadedFile)
+        if hasattr(avatar, "getvalue"):
+            with open(file_path, 'wb') as f:
+                f.write(avatar.getvalue())
+
+        # ✅ CASE 2: đã là string path → không cần save lại
+        elif isinstance(avatar, str):
+            file_path = avatar  # giữ nguyên
+
+        user['avatar_path'] = file_path
 
     # Password change
     if new_password is not None:
@@ -147,8 +160,8 @@ def logout():
     if 'user_domains' in st.session_state:
         del st.session_state['user_domains']
     # ✅ Clear avatar explicitly
-    if 'avatar' in st.session_state:
-        del st.session_state['avatar']
+    if 'avatar_path' in st.session_state:
+        del st.session_state['avatar_path']
 
 def get_user_domains():
     """
@@ -178,8 +191,17 @@ def validate_session():
                 st.session_state.user_sheets_config = user.get('sheets_config', [])
             if 'display_name' not in st.session_state:
                 st.session_state.display_name = user.get('display_name', st.session_state.user_id)
-            if 'avatar' not in st.session_state:
-                st.session_state.avatar = user.get('avatar')
+            if 'avatar_path' not in st.session_state or not st.session_state.avatar_path or not os.path.exists(st.session_state.avatar_path):
+                # Validate before setting
+                avatar_path = user.get('avatar_path')
+                if avatar_path and os.path.exists(avatar_path):
+                    st.session_state.avatar_path = avatar_path
+            # Validate avatar path exists
+            avatar_path = user.get('avatar_path')
+            if avatar_path and os.path.exists(avatar_path):
+                st.session_state.avatar_path = avatar_path
+            else:
+                st.session_state.avatar_path = None
             return True
     return False
 

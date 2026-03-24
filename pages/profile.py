@@ -30,11 +30,20 @@ else:
 setup_page_config()
 
 st.title("👤 Trang Cá nhân")
-if st.session_state.get("avatar"):
-    st.image(
-        f"data:image/png;base64,{st.session_state.avatar}",
-        width=120,
-    )
+avatar_path = st.session_state.get('avatar_path')
+# 🛡️ Defensive image load - prevents PIL crash
+try:
+    if avatar_path and os.path.exists(avatar_path):
+        st.image(avatar_path, width=120)
+    else:
+        raise ValueError("No valid avatar")
+except Exception:
+    initials = st.session_state.get('display_name', st.session_state.user_id or '')[0].upper()
+    st.markdown(f"""
+        <div style='width:120px;height:120px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:36px;'>
+            {initials}
+        </div>
+    """, unsafe_allow_html=True)
 col1, col2 = st.columns([1, 3])
 with col1:
     if st.button("⬅️ Quay lại"):
@@ -66,15 +75,15 @@ with tab1:
         key="avatar_upload"
     )
 
+    # if avatar_file is not None:
+    #     st.image(avatar_file, width=120, caption="Preview avatar mới")
     if avatar_file is not None:
-        st.image(avatar_file, width=120, caption="Preview avatar mới")
+        os.makedirs("avatars", exist_ok=True)
 
-    # elif st.session_state.get("avatar"):
-    #     st.image(
-    #         f"data:image/png;base64,{st.session_state.avatar}",
-    #         width=120,
-    #         caption="Avatar hiện tại"
-    #     )
+        avatar_path = f"avatars/{user_id}.png"
+
+        with open(avatar_path, "wb") as f:
+            f.write(avatar_file.read())
 
     st.divider()
 
@@ -111,44 +120,24 @@ col1, col2 = st.columns([3,1])
 with col1:
     if st.button("💾 Cập nhật thông tin", width='stretch', type="primary"):
 
-        avatar_base64 = st.session_state.get("avatar", None)
-
-        if avatar_file is not None:
-            avatar_base64 = base64.b64encode(avatar_file.read()).decode()
-
         success, msg = update_user(
             user_id,
             new_display_name,
             new_sheets_config,
-            avatar=avatar_base64   # 👈 thêm dòng này
+            avatar=avatar_path   # 👈 truyền path, KHÔNG phải file
         )
+        if success and avatar_file:
+            st.session_state.avatar_path = f"avatars/{user_id}.png"
 
-        # if success:
-        #     st.session_state.display_name = new_display_name
-        #     st.session_state.user_sheets_config = new_sheets_config
-
-        #     if avatar_base64:
-        #         st.session_state.avatar = avatar_base64
-
-        #     save_session_state()
-        #     # init_session_state(restore_auth=True)
-
-        #     st.success(f"✅ {msg}!")
-        #     st.switch_page("dashboard.py")
-        # else:
-        #     st.error(f"❌ {msg}")
         if success:
             st.session_state.display_name = new_display_name
             st.session_state.user_sheets_config = new_sheets_config
-
-            if avatar_base64:
-                st.session_state.avatar = avatar_base64
-
+            # Avatar auto-handled by user_auth.update_user()
             save_session_state()
-
             st.success(f"✅ {msg}!")
-
-            st.switch_page("dashboard.py")  # đủ rồi, không cần init lại
+            st.switch_page("dashboard.py")
+        else:
+            st.error(f"❌ {msg}")
 
 with col2:
     if st.button("🔑 Chỉ đổi mật khẩu", width='stretch'):
