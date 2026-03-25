@@ -108,12 +108,21 @@ def render_tongquan(filtered, sheet_map, selected_days):
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'DM Sans', sans-serif !important; }
 
-    /* Bo góc + shadow cho st.container(border=True) */
+    /* Enhanced card containers with hover effects */
     [data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 16px !important;
-        border: 1px solid rgba(0,0,0,0.07) !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05) !important;
-        background: #ffffff !important;
+        border-radius: 20px !important;
+        border: 1px solid rgba(0,0,0,0.08) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.06) !important;
+        background: linear-gradient(145deg, #ffffff, #fafbfc) !important;
+        transition: all 0.3s ease !important;
+        min-height: 240px !important;
+    }
+    [data-testid="stVerticalBlockBorderWrapper"]:hover {
+        transform: translateY(-4px) !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 20px 48px rgba(0,0,0,0.10) !important;
+    }
+    @media (max-width: 768px) {
+        [data-testid="stVerticalBlockBorderWrapper"] { min-height: 220px !important; }
     }
 
     .card-title {
@@ -192,10 +201,10 @@ def render_tongquan(filtered, sheet_map, selected_days):
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            if st.button("📄 Export PDF", use_container_width=True):
+            if st.button("📄 Export PDF", width="stretch"):
                 st.info("Đang phát triển...")
         with c2:
-            if st.button("📊 Create Snapshot", use_container_width=True):
+            if st.button("📊 Create Snapshot", width="stretch"):
                 domain = st.session_state.get("selected_domain", "Unknown")
                 name = f"{domain[:20]}_{datetime.now().strftime('%Y%m%d_%H%M')}"
                 st.session_state.snapshots[name] = {
@@ -212,7 +221,7 @@ def render_tongquan(filtered, sheet_map, selected_days):
                 st.session_state.selected_snapshot = name
                 st.success(f"✅ {name} ({domain})")
         with c3:
-            if st.button("🔄 Refresh Data", use_container_width=True):
+            if st.button("🔄 Refresh Data", width="stretch"):
                 st.rerun()
 
     st.markdown('<p class="section-header">Tổng quan hiệu suất</p>', unsafe_allow_html=True)
@@ -241,48 +250,54 @@ def render_tongquan(filtered, sheet_map, selected_days):
     # ══════════════════════════════════════════════════════════════════════════
     # LAYOUT: 4 cột — card trái | card giữa | (Top3 + NoRank) | (Top10 + KWlist)
     # ══════════════════════════════════════════════════════════════════════════
-    col_left, col_mid, col_r1, col_r2 = st.columns([1, 1.2, 1.3, 1.3])
+    col_left, col_mid, col_r1, col_r2 = st.columns([1.1, 1.2, 1.2, 1.3])
 
     # ── CARD 1: SEO Score + AI Insights ──────────────────────────────────────
     with col_left:
+        st.markdown('<div style="padding: 0.5rem 0;"></div>', unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown(
-                "<div style='text-align:center;font-size:13px;font-weight:700;color:#374151;margin-bottom:4px'>"
-                "SEO Performance Score</div>",
+                "<div style='padding: 1.5rem; text-align:center;'>"
+                "<div style='font-size:16px;font-weight:700;color:#1f2937;margin-bottom:8px;'>"
+                "SEO Performance Score</div>"
+                "</div>",
                 unsafe_allow_html=True
             )
             make_gauge_chart(score, 100, "điểm", color="#3b82f6")
 
             st.divider()
 
-            st.markdown('<div class="card-title">🤖 AI Insights</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-title" style="padding: 0 1.5rem 0.5rem;">🤖 AI Insights</div>', unsafe_allow_html=True)
             top_insight = next((i for i in insights if i["type"] == "success"), None)
             if top_insight:
                 st.markdown(f"""
-                <div class="insight-box">
+                <div class="insight-box" style="margin: 0 1.5rem 1rem;">
                     <strong style="color:#92400e">🥇 {top_insight['title']}</strong><br/>
                     {top_insight['message']}
                 </div>""", unsafe_allow_html=True)
             else:
                 st.markdown(
-                    '<div class="insight-box"><strong style="color:#92400e">📊 Đang phân tích...</strong>'
+                    '<div class="insight-box" style="margin: 0 1.5rem 1rem;"><strong style="color:#92400e">📊 Đang phân tích...</strong>'
                     '<br/>Chưa có đủ dữ liệu.</div>',
                     unsafe_allow_html=True
                 )
 
     # ── CARD 2: Tổng từ khoá + Phân bố thứ hạng ─────────────────────────────
     with col_mid:
+        st.markdown('<div style="padding: 0.5rem 0;"></div>', unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown(
-                "<div style='text-align:center;font-size:13px;font-weight:700;color:#374151;margin-bottom:4px'>"
-                "Tổng số từ khoá</div>",
+                "<div style='padding: 1.5rem; text-align:center;'>"
+                "<div style='font-size:16px;font-weight:700;color:#1f2937;margin-bottom:8px;'>"
+                "Tổng số từ khoá</div>"
+                "</div>",
                 unsafe_allow_html=True
             )
             make_gauge_chart(ranked_kw, total_kw, "từ khoá", color="#3b82f6")
 
             st.divider()
 
-            st.markdown('<div class="card-title">📊 Phân bố thứ hạng</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-title" style="padding: 0 1.5rem 0.5rem;">📊 Phân bố thứ hạng</div>', unsafe_allow_html=True)
             chart_rank = create_rank_distribution_chart(filtered)
             if not chart_rank.empty:
                 clr_map = {
@@ -294,7 +309,7 @@ def render_tongquan(filtered, sheet_map, selected_days):
                     pct   = row["Số lượng"] / total_r * 100
                     color = clr_map.get(row["Nhóm hạng"], "#6b7280")
                     st.markdown(f"""
-                    <div class="rank-bar-row">
+                    <div class="rank-bar-row" style="padding: 0 1.5rem;">
                         <div class="rank-bar-labels">
                             <span>{row['Nhóm hạng']}</span>
                             <span style="font-weight:700;color:#374151">{pct:.1f}%</span>
@@ -314,7 +329,7 @@ def render_tongquan(filtered, sheet_map, selected_days):
             </div>""", unsafe_allow_html=True)
             st.plotly_chart(
                 make_mini_line(week_labels, top3_vals, "#7c3aed"),
-                use_container_width=True, config={"displayModeBar": False}
+                width="stretch", config={"displayModeBar": False}, key="top3_trend"
             )
 
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
@@ -327,7 +342,7 @@ def render_tongquan(filtered, sheet_map, selected_days):
             </div>""", unsafe_allow_html=True)
             st.plotly_chart(
                 make_mini_line(week_labels, norank_vals, "#7c3aed"),
-                use_container_width=True, config={"displayModeBar": False}
+                width="stretch", config={"displayModeBar": False}, key="norank_trend"
             )
 
     # ── CỘT R2: Top 10 card + Keyword list card ───────────────────────────────
@@ -340,7 +355,7 @@ def render_tongquan(filtered, sheet_map, selected_days):
             </div>""", unsafe_allow_html=True)
             st.plotly_chart(
                 make_mini_line(week_labels, top10_vals, "#7c3aed"),
-                use_container_width=True, config={"displayModeBar": False}
+                width="stretch", config={"displayModeBar": False}, key="top10_trend"
             )
 
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)

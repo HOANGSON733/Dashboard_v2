@@ -31,7 +31,7 @@ footer                            { display: none !important; }
 [data-testid="stMain"]               { padding: 0 !important; overflow: hidden !important; }
 [data-testid="stMainBlockContainer"] { padding: 0 !important; max-width: 100% !important; }
 [data-testid="stAppViewContainer"] > section:first-child { padding: 0 !important; }
-[data-testid="stVerticalBlock"]      { gap: 0 !important; }
+[data-testid="stVerticalBlock"]      { gap: 0px !important; }
 div[data-testid="element-container"] { margin: 0 !important; padding: 0 !important; }
 
 /* ── Full-height two columns ── */
