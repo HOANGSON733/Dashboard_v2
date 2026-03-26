@@ -5,8 +5,9 @@ Lưu và tải trạng thái phiên làm việc
 import streamlit as st
 import json
 import os
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import pandas as pd
+from user_auth import load_users
 
 
 # ===================== SAVE SESSION STATE =====================
@@ -88,10 +89,9 @@ def save_session_state():
 
 
 # ===================== LOAD SESSION STATE =====================
-def load_session_state(restore_auth=True):
-    """Tải session state từ file JSON w/ ROBUST F5-safe validation. restore_auth=False skips auth."""
-    import pandas as pd
-    from user_auth import load_users
+def load_session_state(restore_auth=False):
+    """Load APP DATA only. restore_auth=False by default (secure)."""
+    # App data load logic stays same but default False
     
 # FIXED: Selective clear - ONLY on corruption (F5-safe)
     def force_clear_session():
@@ -216,9 +216,10 @@ def load_app_data_only():
 def clear_all_session_files():
     """Clear ALL session files on logout - enhanced"""
     import glob
-    # Delete all dashboard_session_*.json files
+    # Delete all dashboard_session_*.json + session_auth.json
     session_files = glob.glob("dashboard_session_*.json")
     session_files.append("dashboard_session_default.json")
+    session_files.append("session_auth.json")
     for f in session_files:
         if os.path.exists(f):
             try:
@@ -227,8 +228,59 @@ def clear_all_session_files():
             except Exception as e:
                 print(f"Failed to delete {f}: {e}")
 
-def init_session_state(restore_auth=True):
-    """Khởi tạo session state. restore_auth=True only after login confirmed."""
+def save_auth_state(user_id):
+    """Save current browser auth session (expires 24h)"""
+    auth_data = {
+        'user_id': user_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    with open('session_auth.json', 'w', encoding='utf-8') as f:
+        json.dump(auth_data, f, ensure_ascii=False, indent=2)
+
+def load_auth_state():
+    """Load browser auth state if valid (24h expiry)"""
+    if not os.path.exists('session_auth.json'):
+        return None
+    try:
+        with open('session_auth.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        timestamp = datetime.fromisoformat(data['timestamp'])
+        if datetime.now() - timestamp < timedelta(hours=24):
+            # Validate user exists
+            users = load_users()
+            if any(u['username'] == data['user_id'] for u in users):
+                return data['user_id']
+        os.remove('session_auth.json')  # Expired/invalid → cleanup
+        return None
+    except:
+        if os.path.exists('session_auth.json'):
+            os.remove('session_auth.json')
+        return None
+
+def init_session_state():
+    """Initialize APP data only (auth handled separately)."""
+    # Remove restore_auth param - always safe app data load
+    saved_session = load_session_state(restore_auth=False)
+    
+    # Initialize avatar safely (no user_id dependency)
+    if 'avatar_path' not in st.session_state:
+        st.session_state.avatar_path = None
+    
+    # App data (always safe)
+    if 'goals' not in st.session_state:
+        st.session_state.goals = saved_session.get('goals', {})
+    if 'snapshots' not in st.session_state:
+        st.session_state.snapshots = saved_session.get('snapshots', {})
+    if 'saved_filters' not in st.session_state:
+        st.session_state.saved_filters = saved_session.get('saved_filters', {})
+    if 'selected_domain' not in st.session_state:
+        st.session_state.selected_domain = saved_session.get('selected_domain', '')
+    if 'theme' not in st.session_state:
+        st.session_state.theme = saved_session.get('theme', 'dark').lower()
+    if 'notes' not in st.session_state:
+        st.session_state.notes = saved_session.get('notes', {})
+    if 'display_name' not in st.session_state:
+        st.session_state.display_name = saved_session.get('display_name', '')
     # Always initialize avatar safely first
     if 'avatar_path' not in st.session_state:
         st.session_state.avatar_path = None

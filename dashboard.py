@@ -11,7 +11,7 @@ from datetime import datetime
 # Import modules
 from config import setup_page_config, get_custom_css, ANALYSIS_MODES
 from auth import init_sheets_client
-from persistence import save_session_state, init_session_state, clear_all_session_files
+from persistence import save_session_state, init_session_state, clear_all_session_files, load_auth_state
 from data_loader import load_sheet_data_cached, get_available_days, apply_filters, get_date_range_days
 # from sheets_config import SHEETS  # Removed: now per-user
 
@@ -32,28 +32,32 @@ setup_page_config()
 
 st.markdown(get_custom_css(), unsafe_allow_html=True)
 
-# Restore session FIRST (auth + data) - SAFE avatar handling
-init_session_state(restore_auth=True)
+# ✅ NEW SECURE AUTH: Browser-only session
+from persistence import load_auth_state
+current_user = load_auth_state()
 
-# ✅ Ensure avatar is cleared if no auth
-if not hasattr(st.session_state, 'user_id') or 'user_id' not in st.session_state:
-    if 'avatar_path' in st.session_state:
-        del st.session_state['avatar_path']
-
-# ✅ ROBUST AUTH VALIDATION BEFORE domain check (F5 fix)
-import user_auth
-if not user_auth.validate_session():
+if not current_user:
     st.switch_page("pages/auth.py")
 
-# ✅ AUTO-RESTORE user_sheets_config if missing after validate (F5 safe)
-if 'user_id' in st.session_state and 'user_sheets_config' not in st.session_state:
+# Set user_id from valid auth session
+st.session_state.user_id = current_user
+
+# Load APP data only (safe)
+init_session_state()
+
+# ✅ Restore config if missing
+if 'user_sheets_config' not in st.session_state:
     from user_auth import load_users
     users = load_users()
     for user in users:
-        if user['username'] == st.session_state.user_id:
+        if user['username'] == current_user:
             st.session_state.user_sheets_config = user.get('sheets_config', [])
-            st.session_state.display_name = user.get('display_name', st.session_state.user_id)
+            st.session_state.display_name = user.get('display_name', current_user)
             break
+
+# Clear stale avatar
+if 'avatar_path' in st.session_state:
+    del st.session_state['avatar_path']
 
 # col_left, col_right = st.columns([4,1])
 # with col_right:

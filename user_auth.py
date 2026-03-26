@@ -178,30 +178,8 @@ def is_authenticated():
 
 def validate_session():
     """
-    Validate session w/ AUTO-RECOVERY (F5-safe enhancement)
+    DEPRECATED: Use load_auth_state() instead for secure browser-only auth
     """
-    if 'user_id' not in st.session_state:
-        return False
-    
-    users = load_users()
-    for user in users:
-        if user['username'] == st.session_state.user_id:
-            # ✅ AUTO-RESTORE missing config (F5 safe)
-            if 'user_sheets_config' not in st.session_state:
-                st.session_state.user_sheets_config = user.get('sheets_config', [])
-            if 'display_name' not in st.session_state:
-                st.session_state.display_name = user.get('display_name', st.session_state.user_id)
-            if 'avatar_path' not in st.session_state or not st.session_state.avatar_path or not os.path.exists(st.session_state.avatar_path):
-                # Validate before setting
-                avatar_path = user.get('avatar_path')
-                if avatar_path and os.path.exists(avatar_path):
-                    st.session_state.avatar_path = avatar_path
-            # Validate avatar path exists
-            avatar_path = user.get('avatar_path')
-            if avatar_path and os.path.exists(avatar_path):
-                st.session_state.avatar_path = avatar_path
-            else:
-                st.session_state.avatar_path = None
-            return True
-    return False
+    from persistence import load_auth_state
+    return load_auth_state() is not None
 

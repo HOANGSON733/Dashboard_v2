@@ -3,7 +3,7 @@ import sys, os, base64, pathlib
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from user_auth import login_user, register_user, logout, is_authenticated
 from config import setup_page_config
-from persistence import save_session_state, clear_all_session_files, init_session_state
+from persistence import save_session_state, clear_all_session_files, init_session_state, save_auth_state
 
 setup_page_config()
 
@@ -382,12 +382,13 @@ with right_col:
                     st.session_state.user_id            = username
                     st.session_state.display_name       = user_config.get("display_name", username)
                     st.session_state.user_sheets_config = user_config["sheets_config"]
-                    # ✅ Clear then set avatar post-login
+                    # ✅ Clear then set avatar post-login (F5-safe)
                     if 'avatar_path' in st.session_state:
                         del st.session_state['avatar_path']
                     st.session_state.avatar_path = user_config.get('avatar_path')
+                    save_auth_state(username)
                     save_session_state()
-                    init_session_state(restore_auth=True)
+                    init_session_state()
                     st.success("✅ Đăng nhập thành công!")
                     st.switch_page("dashboard.py")
                 else:
@@ -460,12 +461,13 @@ with right_col:
                             st.session_state.user_id            = new_username
                             st.session_state.display_name       = user_config.get("display_name", new_username)
                             st.session_state.user_sheets_config = user_config["sheets_config"]
-                            # ✅ Clear then set avatar post-register
+                            # ✅ Clear then set avatar post-register (F5-safe)
                             if 'avatar_path' in st.session_state:
                                 del st.session_state['avatar_path']
                             st.session_state.avatar_path = user_config.get('avatar_path')
+                            save_auth_state(new_username)
                             save_session_state()
-                            init_session_state(restore_auth=True)
+                            init_session_state()
                             st.success(f"✅ Đăng ký thành công, chào {st.session_state.display_name}!")
                             st.switch_page("dashboard.py")
                         else:
@@ -478,7 +480,9 @@ with right_col:
 if is_authenticated():
     display = st.session_state.get("display_name", st.session_state.user_id)
     st.success(f"Đã đăng nhập: {display}")
-    if st.button("🚪 Đăng xuất"):
-        logout()
-        clear_all_session_files()
-        st.rerun()
+if st.button("🚪 Đăng xuất"):
+    logout()
+    if os.path.exists('session_auth.json'):
+        os.remove('session_auth.json')
+    clear_all_session_files()
+    st.rerun()

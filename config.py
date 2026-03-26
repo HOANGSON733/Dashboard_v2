@@ -24,7 +24,7 @@ ANALYSIS_MODES = [
     "Dự báo",
     "Snapshots",
     "Lịch nhiệt",
-    # "Google Analytics"
+    "Google Analytics"
 ]
 
 # ===================== GOOGLE ANALYTICS WEBSITES =====================
