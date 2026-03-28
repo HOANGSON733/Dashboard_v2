@@ -185,31 +185,17 @@ def load_auth_state(user_id):
     return SessionsManager().load_auth_state(user_id)
 
 def save_auth_state_file(user_id):
-    """Save auth state to file for F5 persistence"""
-    import json
-    auth_data = {
-        "user_id": user_id,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    with open('session_auth.json', 'w') as f:
-        json.dump(auth_data, f)
+    """NO-OP: file-based auth persistence is deprecated for security reasons."""
+    # Previously this wrote a shared server file session_auth.json.
+    # This is insecure in multi-user/multi-machine environments because it leaks
+    # the last logged-in user to all other sessions on the same server.
+    return None
 
 def load_auth_state_file():
     """Load auth state from file"""
-    import json, os
-    if os.path.exists('session_auth.json'):
-        try:
-            with open('session_auth.json', 'r') as f:
-                data = json.load(f)
-            user_id = data.get('user_id')
-            timestamp_str = data.get('timestamp')
-            if user_id and timestamp_str:
-                timestamp = datetime.fromisoformat(timestamp_str)
-                # Check if within 24 hours
-                if (datetime.utcnow() - timestamp) < timedelta(hours=24):
-                    return user_id
-        except:
-            pass
+    # File-based auth state is deprecated and disabled to prevent a shared
+    # auth state across different clients. Authentication is now session-only
+    # in Streamlit + server-side auth TTL in MongoDB.
     return None
 
 def init_session_state():

@@ -4,7 +4,7 @@ import base64
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from user_auth import login_user, logout, is_authenticated, update_user
 from config import setup_page_config
-from persistence import save_session_state, init_session_state, load_auth_state_file
+from persistence import save_session_state, init_session_state
 from user_auth import validate_session
 
 # ─── HIDE SIDEBAR ──────────────────────────────────────────────────────────────
@@ -13,16 +13,11 @@ st.markdown("""<style>section[data-testid="stSidebar"]{display:none!important;}<
 
 # ─── AUTH GUARD ────────────────────────────────────────────────────────────────
 # ─── NEW SECURE AUTH GUARD WITH FILE PERSISTENCE ──
-user_id = st.session_state.get('user_id')
-if not user_id:
-    # Try to load from file (for F5 refresh)
-    user_id = load_auth_state_file()
-    if user_id:
-        st.session_state.user_id = user_id
-
 if not validate_session():
     st.switch_page("pages/auth.py")
 init_session_state()
+
+user_id = st.session_state.get('user_id')
 
 setup_page_config()
 

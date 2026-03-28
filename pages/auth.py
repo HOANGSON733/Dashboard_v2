@@ -388,7 +388,6 @@ with right_col:
                         del st.session_state['avatar_path']
                     st.session_state.avatar_path = user_config.get('avatar_path')
                     save_auth_state(username)
-                    save_auth_state_file(username)
                     save_session_state()
                     init_session_state()
                     st.rerun()
@@ -469,7 +468,6 @@ with right_col:
                                 del st.session_state['avatar_path']
                             st.session_state.avatar_path = user_config.get('avatar_path')
                             save_auth_state(new_username)
-                            save_auth_state_file(new_username)
                             save_session_state()
                             init_session_state()
                             st.success(f"✅ Đăng ký thành công, chào {st.session_state.display_name}!")
@@ -486,7 +484,5 @@ if is_authenticated():
     st.success(f"Đã đăng nhập: {display}")
 if st.button("🚪 Đăng xuất"):
     logout()
-    if os.path.exists('session_auth.json'):
-        os.remove('session_auth.json')
     clear_all_session_files()
     st.rerun()

@@ -33,20 +33,10 @@ setup_page_config()
 st.markdown(get_custom_css(), unsafe_allow_html=True)
 
 # ✅ NEW SECURE AUTH: Browser-only session + File persistence for F5
-from persistence import load_auth_state_file
-
 user_id = st.session_state.get('user_id')
-if not user_id:
-    # Try to load from file (for F5 refresh)
-    user_id = load_auth_state_file()
-    if user_id:
-        st.session_state.user_id = user_id
-        # Load other session data if needed
-        from persistence import load_session_state
-        saved_session = load_session_state()
-        for key, value in saved_session.items():
-            if key not in st.session_state:
-                st.session_state[key] = value
+
+# For multi-user security, do not import shared file-based auth state.
+# Each browser session must have its own session_state set via login.
 
 if not user_id:
     from user_auth import validate_session
