@@ -390,7 +390,6 @@ with right_col:
                     save_auth_state(username)
                     save_session_state()
                     init_session_state()
-                    st.rerun()
                     st.success("✅ Đăng nhập thành công!")
                     st.switch_page("dashboard.py")
                 else:
