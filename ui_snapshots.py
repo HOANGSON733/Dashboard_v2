@@ -5,6 +5,7 @@ Clone UI theo ảnh: card grid 3 cột, bảng xem, so sánh 2 cột
 
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from persistence import save_session_state
 
 
@@ -239,7 +240,21 @@ div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] + div[
 # HELPER: render 1 snapshot card
 # ─────────────────────────────────────────
 def _snap_card(snap_name, snap_data, is_viewing):
-    date_str = snap_data["date"].strftime("%d/%m/%Y %H:%M")
+    def format_snapshot_date(date_obj):
+        if isinstance(date_obj, str):
+            try:
+                # Handle ISO with/without T, various formats
+                date_str = date_obj.replace(' ', 'T')
+                dt = datetime.fromisoformat(date_str)
+            except Exception:
+                return "Ngày không hợp lệ"
+        elif hasattr(date_obj, 'strftime'):
+            dt = date_obj
+        else:
+            return "Ngày không hợp lệ"
+        return dt.strftime("%d/%m/%Y %H:%M")
+
+    date_str = format_snapshot_date(snap_data["date"])
     score    = snap_data["score"]
     note     = snap_data.get("note", "") or "Chưa có ghi chú"
 

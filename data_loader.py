@@ -34,10 +34,17 @@ def load_sheet_data_cached(_client, sheet_id, selected_days):
             return None, None
 
         sheet_map = {name: dt for name, dt in date_sheets}
+        
+        # Filter to only available days to prevent KeyError
+        valid_days = [day for day in selected_days if day in sheet_map]
+        missing_days = set(selected_days) - set(sheet_map.keys())
+        if missing_days:
+            st.warning(f"⚠️ Missing sheets for days: {', '.join(sorted(missing_days))}. Using {len(valid_days)}/{len(selected_days)} available days.")
 
         all_data = []
-        for ws_name in selected_days:
+        for ws_name in valid_days:
             try:
+
                 ws = sh.worksheet(ws_name)
                 rows = ws.get_all_records()
                 df_day = pd.DataFrame(rows)
@@ -141,10 +148,13 @@ def get_date_range_days(sheet_map, start_date, end_date):
 # ===================== COMPARISON DATA =====================
 def get_comparison_data(filtered, selected_days, sheet_map):
     """Tạo dữ liệu so sánh giữa 2 ngày"""
-    if len(selected_days) < 2:
+    # Filter valid days to prevent KeyError
+    valid_days = [d for d in selected_days if d in sheet_map]
+    if len(valid_days) < 2:
+        st.warning("⚠️ Need at least 2 valid days in sheet_map for comparison.")
         return None
-
-    dates_sorted = sorted(selected_days, key=lambda x: sheet_map[x])
+    
+    dates_sorted = sorted(valid_days, key=lambda x: sheet_map[x])
     latest_date = sheet_map[dates_sorted[-1]].strftime("%d-%m-%Y")
     prev_date = sheet_map[dates_sorted[-2]].strftime("%d-%m-%Y")
 
@@ -293,10 +303,13 @@ def get_url_declining(df, top_n=9):
 
 def get_url_comparison(url_data, selected_days, sheet_map):
     """So sánh URL giữa 2 ngày"""
-    if len(selected_days) < 2:
+    # Filter valid days to prevent KeyError
+    valid_days = [d for d in selected_days if d in sheet_map]
+    if len(valid_days) < 2:
+        st.warning("⚠️ Need at least 2 valid days in sheet_map for URL comparison.")
         return pd.DataFrame()
-
-    dates_sorted = sorted(selected_days, key=lambda x: sheet_map[x])
+    
+    dates_sorted = sorted(valid_days, key=lambda x: sheet_map[x])
     latest_date = sheet_map[dates_sorted[-1]].strftime("%d-%m-%Y")
     prev_date = sheet_map[dates_sorted[-2]].strftime("%d-%m-%Y")
 

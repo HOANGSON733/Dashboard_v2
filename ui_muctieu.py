@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 from persistence import save_session_state
 
 
@@ -59,6 +59,22 @@ def render_muctieu(filtered):
     overdue = 0
     in_progress = 0
 
+    def safe_date_subtract(deadline_obj):
+        today = datetime.now().date()
+        if isinstance(deadline_obj, str):
+            try:
+                dl_str = deadline_obj.replace(' ', 'T')
+                dl_date = datetime.fromisoformat(dl_str).date()
+            except Exception:
+                return 999  # Treat invalid as future
+        elif isinstance(deadline_obj, date):
+            dl_date = deadline_obj
+        elif hasattr(deadline_obj, 'date'):
+            dl_date = deadline_obj.date()
+        else:
+            return 999
+        return (dl_date - today).days
+
     for goal in goals.values():
         kw_data = filtered[filtered["Từ khóa"] == goal["keyword"]]
 
@@ -67,7 +83,7 @@ def render_muctieu(filtered):
 
             if pd.notna(latest_rank) and latest_rank <= goal["target"]:
                 achieved += 1
-            elif (goal["deadline"] - datetime.now().date()).days < 0:
+            elif safe_date_subtract(goal["deadline"]) < 0:
                 overdue += 1
             else:
                 in_progress += 1

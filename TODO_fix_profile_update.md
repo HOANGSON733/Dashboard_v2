@@ -1,0 +1,3 @@
+- [✅] 2. Update pages/profile.py (separate avatar/personal/domain updates)
+- [✅] 3. Robustify user_auth.py update_user()
+- [✅] 4. Add save_session_state() + st.rerun() persistence fixes

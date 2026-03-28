@@ -4,18 +4,24 @@ import base64
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from user_auth import login_user, logout, is_authenticated, update_user
 from config import setup_page_config
-from persistence import save_session_state, init_session_state, load_auth_state
+from persistence import save_session_state, init_session_state, load_auth_state_file
+from user_auth import validate_session
 
 # ─── HIDE SIDEBAR ──────────────────────────────────────────────────────────────
 st.markdown("""<style>section[data-testid="stSidebar"]{display:none!important;}</style>""",
             unsafe_allow_html=True)
 
 # ─── AUTH GUARD ────────────────────────────────────────────────────────────────
-# ─── NEW SECURE AUTH GUARD ──
-current_user = load_auth_state()
-if not current_user:
+# ─── NEW SECURE AUTH GUARD WITH FILE PERSISTENCE ──
+user_id = st.session_state.get('user_id')
+if not user_id:
+    # Try to load from file (for F5 refresh)
+    user_id = load_auth_state_file()
+    if user_id:
+        st.session_state.user_id = user_id
+
+if not validate_session():
     st.switch_page("pages/auth.py")
-st.session_state.user_id = current_user
 init_session_state()
 
 setup_page_config()
@@ -288,9 +294,19 @@ if st.button("← Quay lại Dashboard"):
 
 st.markdown("<br>", unsafe_allow_html=True)
 # ─── DATA ──────────────────────────────────────────────────────────────────────
+# Safe reload avatar from DB
+try:
+    from user_auth import UserManager
+    um = UserManager()
+    # Get profile without password check
+    user_doc = um.users.find_one({'username': user_id})
+    if user_doc:
+        st.session_state.avatar_path = user_doc.get('avatar_path')
+except:
+    pass
+
 avatar_path    = st.session_state.get('avatar_path')
-display_name   = st.session_state.get('display_name', st.session_state.user_id)
-user_id        = st.session_state.user_id
+display_name   = st.session_state.get('display_name', user_id)
 
 # ─── HERO CARD ────────────────────────────────────────────────────────────────
 # ─── HERO CARD ────────────────────────────────────────────────────────────────
@@ -367,11 +383,29 @@ with tab1:
         key="avatar_upload",
         help="Định dạng: PNG, JPG. Khuyến nghị ảnh vuông."
     )
+    new_avatar_path = avatar_path  # Default to current avatar
     if avatar_file is not None:
         os.makedirs("avatars", exist_ok=True)
-        avatar_path = f"avatars/{user_id}.png"
-        with open(avatar_path, "wb") as f:
+        new_avatar_path = f"avatars/{user_id}.png"
+        with open(new_avatar_path, "wb") as f:
             f.write(avatar_file.read())
+        # Update session state immediately when file is uploaded
+        st.session_state.avatar_path = new_avatar_path
+        
+        # Save to DB immediately (AVATAR ONLY - keep current display_name & sheets_config)
+        current_display_name = st.session_state.get('display_name', user_id)
+        current_sheets_config = st.session_state.get('user_sheets_config', [])
+        success, msg = update_user(
+            user_id, current_display_name, current_sheets_config,
+            avatar=new_avatar_path
+        )
+        if success:
+            save_session_state()
+            st.session_state.avatar_path = new_avatar_path  # Ensure sync
+            st.success("✅ Ảnh đại diện đã được tải lên và lưu!")
+            st.rerun()
+        else:
+            st.error(f"❌ Lỗi lưu ảnh: {msg}")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -432,27 +466,42 @@ with tab2:
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown('<div class="section-title">✦ Hành động</div>', unsafe_allow_html=True)
 
-col_save, col_pw_btn = st.columns([5, 5])
+col_save, col_save_domains, col_pw_btn = st.columns([3, 3, 3])
 
 with col_save:
-    if st.button("💾  Lưu thay đổi", type="primary", use_container_width=True):
+    if st.button("💾  Lưu thông tin cá nhân", type="primary", use_container_width=True):
+        # PERSONAL ONLY - keep current sheets_config & avatar
+        current_sheets_config = st.session_state.get('user_sheets_config', [])
         success, msg = update_user(
-            user_id, new_display_name, new_sheets_config,
-            avatar=avatar_path
+            user_id, new_display_name, current_sheets_config,
+            avatar=None
         )
-        if success and avatar_file:
-            st.session_state.avatar_path = f"avatars/{user_id}.png"
         if success:
             st.session_state.display_name = new_display_name
+            save_session_state()
+            st.success(f"✅ {msg}!")
+            st.rerun()
+        else:
+            st.error(f"❌ {msg}")
+
+with col_save_domains:
+    if st.button("💾  Lưu Domain", use_container_width=True):
+        # DOMAIN ONLY - keep current display_name & avatar
+        current_display_name = st.session_state.get('display_name', display_name)
+        success, msg = update_user(
+            user_id, current_display_name, new_sheets_config,
+            avatar=None
+        )
+        if success:
             st.session_state.user_sheets_config = new_sheets_config
             save_session_state()
             st.success(f"✅ {msg}!")
-            st.switch_page("dashboard.py")
+            st.rerun()
         else:
             st.error(f"❌ {msg}")
 
 with col_pw_btn:
-    if st.button("🔑  Chỉ đổi mật khẩu", use_container_width=True):
+    if st.button("🔑  Đổi mật khẩu", use_container_width=True):
         if new_password != confirm_password:
             st.error("Mật khẩu xác nhận không khớp")
         elif len(new_password) < 6:

@@ -178,20 +178,22 @@ def render_sosanh(filtered, sheet_map, selected_days):
     inject_css()
     st.markdown("## So sánh thay đổi thứ hạng")
 
-    if len(selected_days) < 2:
-        st.warning("⚠️ Cần chọn ít nhất 2 ngày để so sánh")
+    # Filter valid days to prevent KeyError
+    valid_selected_days = [d for d in selected_days if d in sheet_map]
+    if len(valid_selected_days) < 2:
+        st.warning("⚠️ Cần chọn ít nhất 2 ngày có dữ liệu để so sánh")
         return
 
     # ── 3-column master layout ───────────────────────────────────────
     col_left, col_mid, col_right = st.columns([1.1, 1.3, 2.2], gap="medium")
 
     # ════════════════════════════════════════════════════════════════
-    # LEFT: date selector + top keywords
+    # LEFT: date selector + top keywords (use valid days)
     # ════════════════════════════════════════════════════════════════
     with col_left:
         st.markdown("<div style='font-size:15px;color:#6b7280;margin-bottom:2px;'>Ngày cũ (Baseline)</div>",
                     unsafe_allow_html=True)
-        compare_date1 = st.selectbox("d1", selected_days, index=0,
+        compare_date1 = st.selectbox("d1", valid_selected_days, index=0,
                                      label_visibility="collapsed", key="ss_d1")
 
         st.markdown("<div style='font-size:15px;color:#6b7280;margin-bottom:2px;margin-top:6px;'>Ngày mới (So sánh)</div>",
@@ -201,6 +203,10 @@ def render_sosanh(filtered, sheet_map, selected_days):
 
         st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
 
+        # Safe access with validation
+        if compare_date1 not in sheet_map or compare_date2 not in sheet_map:
+            st.error("❌ Selected dates not in sheet_map. Please refresh.")
+            return
         date1_str   = sheet_map[compare_date1].strftime("%d-%m-%Y")
         date2_str   = sheet_map[compare_date2].strftime("%d-%m-%Y")
         date1_label = sheet_map[compare_date1].strftime("%d/%m/%Y")

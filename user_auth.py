@@ -1,167 +1,112 @@
+# user_auth.py - handles user registration, login, logout, and profile updates with MongoDB
 import streamlit as st
-import json
-import os
-import bcrypt
-
-USERS_FILE = 'users.json'
+from db import UserManager, SessionsManager
 
 def load_users():
-    """
-    Load users from JSON file.
-    """
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get('users', [])
-        except json.JSONDecodeError:
-            print("Warning: users.json corrupted, returning empty users list")
-            return []
-    return []
+    """Load users from MongoDB"""
+    return UserManager().list_users()
 
-def save_users(users):
-    """
-    Save users to JSON file.
-    """
-    data = {'users': users}
-    with open(USERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
-def hash_password(password):
-    """
-    Hash password using bcrypt.
-    """
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
-def verify_password(password, hashed):
-    """
-    Verify password against hash.
-    """
-    try:
-        import base64
-        return bcrypt.checkpw(password.encode('utf-8'), base64.b64decode(hashed))
-    except:
-        # Legacy direct str hash
-        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 def register_user(username, password, display_name, sheets_config):
     """
-    Register new user. sheets_config is list of {'domain':str, 'sheet_id':str, 'worksheet':str}. Returns True if successful.
+    Register new user with full profile.
     """
-    users = load_users()
-    if any(u['username'] == username for u in users):
-        return False, "Username already exists"
-    if len(display_name.strip()) < 2:
-        return False, "Họ và tên quá ngắn"
-    hashed_pw = hash_password(password)
-    import base64
-    user = {
-        'username': username,
-        'display_name': display_name.strip(),
-        'hashed_password': base64.b64encode(hashed_pw).decode('ascii'),
-        'sheets_config': sheets_config  # list of dicts
-    }
-    users.append(user)
-    save_users(users)
-    return True, "Registered successfully"
-
-def login_user(username, password):
-    users = load_users()
-    for user in users:
-        if user['username'] == username and verify_password(password, user['hashed_password']):
-            user_data = {
-                'sheets_config': user.get('sheets_config', []),
-                'display_name': user.get('display_name', username),
-'avatar_path': user.get('avatar_path')
-            }
-            # ✅ Explicit avatar set - prevents stale
-            st.session_state.avatar_path = user_data.get('avatar_path')
-            
-            return True, user_data
-    return False, "Invalid username or password"
-
-def update_user(username, new_display_name, new_sheets_config, avatar=None, old_password=None, new_password=None):
-    """
-    Update user profile. Returns (success, msg).
-    """
-    users = load_users()
-    user_idx = None
-
-    for i, u in enumerate(users):
-        if u['username'] == username:
-            user_idx = i
-            break
-
-    if user_idx is None:
-        return False, "User not found"
-
-    user = users[user_idx]
 
     # Validate display_name
-    if len(new_display_name.strip()) < 2:
+    if len(display_name.strip()) < 2:
         return False, "Họ và tên quá ngắn"
 
     # Validate sheets_config
-    for config in new_sheets_config:
+    if not sheets_config or len(sheets_config) == 0:
+        return False, "Phải có ít nhất 1 domain"
+
+    for config in sheets_config:
         if not all(k in config for k in ['domain', 'sheet_id', 'worksheet']):
             return False, "Mỗi domain phải có domain, sheet_id, worksheet"
         if not config['domain'].strip():
             return False, "Tên domain không được rỗng"
 
-    # ✅ Update info
-    user['display_name'] = new_display_name.strip()
-    user['sheets_config'] = new_sheets_config
+    um = UserManager()
 
-    # ✅ NEW: lưu avatar as file
+    # 👉 Tạo user trước
+    success, msg = um.register(username, password)
+    if not success:
+        return False, msg
+
+    # 👉 Sau đó update profile (QUAN TRỌNG)
+    success, msg = um.update_profile(
+        username,
+        display_name.strip(),
+        sheets_config,
+        avatar_path=None
+    )
+
+    return success, msg
+
+def login_user(username, password):
+    success, _, profile = UserManager().login_flex(username, password)
+    if success:
+        st.session_state.avatar_path = profile.get('avatar_path')
+        return True, profile
+    return False, "Invalid username or password"
+
+def validate_sheets_config(configs):
+    """Validate sheets_config - return True if OK"""
+    if not configs:
+        return True  # Empty OK
+    for config in configs:
+        if not all(k in config for k in ['domain', 'sheet_id', 'worksheet']):
+            return False
+        if not config['domain'].strip():
+            return False
+    return True
+
+def update_user(username, new_display_name=None, new_sheets_config=None, avatar=None, old_password=None, new_password=None):
+    """
+    Partial update user profile. Updates only provided valid fields.
+    """
+    errors = []
+    
+    # Validate each field independently
+    if new_display_name and len(new_display_name.strip()) < 2:
+        errors.append("Họ tên quá ngắn")
+    
+    if new_sheets_config is not None and not validate_sheets_config(new_sheets_config):
+        errors.append("Sheets config invalid")
+    
+    if errors:
+        return False, "; ".join(errors)
+    
+    # Prepare params - use None for unchanged fields
+    display_name = new_display_name.strip() if new_display_name else None
+    sheets_config = new_sheets_config if new_sheets_config is not None else None
+    avatar_path = None
+    
     if avatar is not None:
+        import os
         os.makedirs('avatars', exist_ok=True)
         file_path = f'avatars/{username}.png'
-
-        # ✅ CASE 1: upload file (Streamlit UploadedFile)
         if hasattr(avatar, "getvalue"):
             with open(file_path, 'wb') as f:
                 f.write(avatar.getvalue())
-
-        # ✅ CASE 2: đã là string path → không cần save lại
+            avatar_path = file_path
         elif isinstance(avatar, str):
-            file_path = avatar  # giữ nguyên
-
-        user['avatar_path'] = file_path
-
-    # Password change
-    if new_password is not None:
-        if not old_password:
-            return False, "Phải nhập mật khẩu cũ để thay đổi"
-        if not verify_password(old_password, user['hashed_password']):
-            return False, "Mật khẩu cũ không đúng"
-
-        hashed_new = hash_password(new_password)
-        import base64
-        user['hashed_password'] = base64.b64encode(hashed_new).decode('ascii')
-
-    save_users(users)
-    return True, "Cập nhật thành công"
+            avatar_path = avatar
+    
+    # Call DB with partial params
+    result = UserManager().update_profile(username, display_name, sheets_config, avatar_path, old_password, new_password)
+    return result
 
 def logout():
-    """
-    Logout current user - FIXED.
-    """
-    # Clear ALL persistent session files
-    try:
-        import persistence
-        persistence.clear_all_session_files()
-    except ImportError:
-        pass
+    """Logout current user"""
+    user_id = st.session_state.get('user_id')
+    if user_id:
+        SessionsManager().clear_user_sessions(user_id)
     # Clear session state
-    if 'user_id' in st.session_state:
-        del st.session_state['user_id']
-    if 'user_sheets_config' in st.session_state:
-        del st.session_state['user_sheets_config']
-    if 'user_domains' in st.session_state:
-        del st.session_state['user_domains']
-    # ✅ Clear avatar explicitly
-    if 'avatar_path' in st.session_state:
-        del st.session_state['avatar_path']
+    for key in ['user_id', 'user_sheets_config', 'user_domains', 'avatar_path', 'display_name']:
+        if key in st.session_state:
+            del st.session_state[key]
 
 def get_user_domains():
     """
@@ -177,9 +122,9 @@ def is_authenticated():
     return 'user_id' in st.session_state
 
 def validate_session():
-    """
-    DEPRECATED: Use load_auth_state() instead for secure browser-only auth
-    """
-    from persistence import load_auth_state
-    return load_auth_state() is not None
+    """Check auth state from Mongo"""
+    user_id = st.session_state.get('user_id')
+    if not user_id:
+        return False
+    return SessionsManager().load_auth_state(user_id) is not None
 
