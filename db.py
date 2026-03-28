@@ -382,3 +382,45 @@ class SessionsManager:
             print(f"Migrated {migrated} users from JSON")
         except Exception as e:
             print(f"Migration error: {e}")
+
+class SessionsManager:
+    def __init__(self, db_name="checktop_app"):
+        self.db = DatabaseConnection().get_database(db_name)
+        self.sessions = self.db["sessions"]
+        self.auth_sessions = self.db["auth_sessions"]
+        # Create TTL index for auth_sessions (24 hours)
+        try:
+            self.auth_sessions.create_index("created_at", expireAfterSeconds=86400)
+        except:
+            pass  # Index might already exist
+
+    def save_auth_state(self, user_id):
+        """Save auth state with 24h TTL"""
+        self.auth_sessions.update_one(
+            {"user_id": user_id},
+            {"$set": {"user_id": user_id, "created_at": datetime.utcnow()}},
+            upsert=True
+        )
+
+    def load_auth_state(self, user_id):
+        """Load auth state - returns dict if exists, None if expired/not found"""
+        doc = self.auth_sessions.find_one({"user_id": user_id})
+        return doc if doc else None
+
+    def save_session(self, user_id, session_data):
+        """Save session data"""
+        self.sessions.update_one(
+            {"user_id": user_id},
+            {"$set": {"user_id": user_id, "data": session_data, "updated_at": datetime.utcnow()}},
+            upsert=True
+        )
+
+    def load_session(self, user_id):
+        """Load session data"""
+        doc = self.sessions.find_one({"user_id": user_id})
+        return doc.get("data", {}) if doc else {}
+
+    def clear_user_sessions(self, user_id):
+        """Clear all sessions for user"""
+        self.sessions.delete_one({"user_id": user_id})
+        self.auth_sessions.delete_one({"user_id": user_id})
