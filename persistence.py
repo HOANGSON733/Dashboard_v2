@@ -61,6 +61,9 @@ def serialize_session_data():
             snap_serial['data'] = str(data_val)
         session_data['snapshots'][name] = snap_serial
     
+    # Serialize marked_keywords
+    session_data['marked_keywords'] = [[str(kw), str(day)] for kw, day in st.session_state.get('marked_keywords', set())]
+    
     return session_data
 
 def save_session_state():
@@ -69,6 +72,21 @@ def save_session_state():
     if user_id != 'default':
         session_data = serialize_session_data()
         SessionsManager().save_session(user_id, session_data)
+
+def save_marked_keywords():
+    """Save marked keywords to MongoDB immediately"""
+    user_id = st.session_state.get('user_id', 'default')
+    if user_id != 'default' and 'marked_keywords' in st.session_state:
+        keywords_list = [[str(kw), str(day)] for kw, day in st.session_state.marked_keywords]
+        SessionsManager().save_marked_keywords(user_id, keywords_list)
+
+def load_marked_keywords():
+    """Load marked keywords from MongoDB"""
+    user_id = st.session_state.get('user_id', 'default')
+    if user_id == 'default':
+        return set()
+    keywords_list = SessionsManager().load_marked_keywords(user_id)
+    return set(tuple(k) for k in keywords_list)
 
 
 # ===================== LOAD SESSION STATE =====================
@@ -213,4 +231,10 @@ def init_session_state():
     for key in ['goals', 'snapshots', 'saved_filters', 'selected_domain', 'theme', 'notes', 'display_name']:
         if key not in st.session_state:
             st.session_state[key] = saved_session.get(key, {} if key in ['goals', 'snapshots', 'saved_filters', 'notes'] else '' if key == 'selected_domain' else 'dark')
+    
+    # Load marked_keywords (convert list of lists to set of tuples)
+    if 'marked_keywords' not in st.session_state:
+        st.session_state.marked_keywords = set()
+    if 'marked_keywords' in saved_session:
+        st.session_state.marked_keywords = set(tuple(k) for k in saved_session['marked_keywords'])
 

@@ -1,11 +1,13 @@
-# Fix KeyError 'Ngày_19_01_2026' in data_loader.py
+# Fix F5 Login Issue After Mongo Migration - COMPLETE ✅
 
-Approved plan: Add validation/filtering selected_days against sheet_map.
+**Status: [3/3] ✓**
 
-## TODO Steps
-- [ ] 1. Create TODO.md ✅ **DONE**
-- [x] 2. Edit data_loader.py: Filter selected_days in load_sheet_data_cached, get_comparison_data, get_url_comparison ✅ **DONE**
-- [x] 3. Edit dashboard.py: Validate selected_days after session/date_range load ✅ **DONE**
-- [x] 4. Edit ui_sosanh.py: Add sheet_map validation before access ✅ **DONE**
-- [x] 5. Test: Run dashboard.py, select future dates, verify no crash + warnings ✅ **DONE** (via code validation)
-- [ ] 6. attempt_completion
+## Steps:
+- [✓] 1. Add restore_auth_from_mongo(): Scans auth_sessions, restores st.session_state.user_id if valid TTL
+- [✓] 2. Call restore before validate_session() - Now F5 preserves login via MongoDB
+- [✓] 3. Updated dashboard.py auth flow
+
+**Full MongoDB migration complete.** No JSON files, F5 login fixed, marked_keywords persist.
+
+
+

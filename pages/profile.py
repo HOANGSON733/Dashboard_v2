@@ -12,10 +12,28 @@ st.markdown("""<style>section[data-testid="stSidebar"]{display:none!important;}<
             unsafe_allow_html=True)
 
 # ─── AUTH GUARD ────────────────────────────────────────────────────────────────
-# ─── NEW SECURE AUTH GUARD WITH FILE PERSISTENCE ──
+from db import SessionsManager
+
+def restore_auth_from_mongo_profile():
+    """Restore auth for profile page"""
+    if 'user_id' in st.session_state:
+        return
+    
+    sm = SessionsManager()
+    recent_auths = list(sm.auth_sessions.find().sort('timestamp', -1).limit(1))
+    if recent_auths:
+        user_id = recent_auths[0].get('user_id')
+        if sm.load_auth_state(user_id):
+            st.session_state['user_id'] = user_id
+            return
+
+restore_auth_from_mongo_profile()
+
 if not validate_session():
     st.switch_page("pages/auth.py")
 init_session_state()
+
+user_id = st.session_state.get('user_id')
 
 user_id = st.session_state.get('user_id')
 

@@ -1,22 +1,4 @@
-def ensure_default_admins():
-    """Tạo 2 tài khoản admin mặc định nếu chưa có admin nào."""
-    user_manager = UserManager()
-    admin_count = user_manager.users.count_documents({"role": "admin"})
-    if admin_count == 0:
-        # Tạo 2 admin mặc định
-        user_manager.users.insert_one({
-            "username": "admin1",
-            "password": user_manager.hash_password("admin123"),
-            "role": "admin",
-            "created_at": datetime.utcnow()
-        })
-        user_manager.users.insert_one({
-            "username": "admin2",
-            "password": user_manager.hash_password("admin123"),
-            "role": "admin",
-            "created_at": datetime.utcnow()
-        })
-        print("Đã tạo 2 tài khoản admin mặc định: admin1/admin123, admin2/admin123")
+
 import pymongo, os
 import threading
 import json
@@ -158,8 +140,12 @@ class SessionsManager:
     def __init__(self, db_name="checktop_app"):
         self.db = DatabaseConnection().get_database(db_name)
         self.sessions = self.db["sessions"]
-        # TTL index for auth_sessions
         self.auth_sessions = self.db["auth_sessions"]
+        # TTL index for auth_sessions (24h)
+        try:
+            self.auth_sessions.create_index("timestamp", expireAfterSeconds=86400)
+        except:
+            pass  # Index may exist
 
     def save_session(self, user_id, session_data):
         """Save full session data as JSON doc"""
@@ -176,7 +162,7 @@ class SessionsManager:
     def load_session(self, user_id):
         """Load session data"""
         doc = self.sessions.find_one({"user_id": user_id})
-        return doc["session_data"] if doc else {}
+        return doc.get("session_data", {}) if doc else {}
 
     def save_auth_state(self, user_id):
         """Save auth state with TTL 24h"""
@@ -197,230 +183,23 @@ class SessionsManager:
         self.auth_sessions.delete_one({"user_id": user_id})
         return None
 
-    def clear_user_sessions(self, user_id):
-        """Clear all sessions for user"""
-        self.sessions.delete_one({"user_id": user_id})
-        self.auth_sessions.delete_one({"user_id": user_id})
-
-    def register(self, username, password, role="user", creator_role=None, machine_info=None):
-        """
-        Đăng ký user mới. Ai cũng đăng ký được user. Chỉ admin mới tạo được admin/tester.
-        creator_role: role của người tạo (None nếu tự đăng ký)
-        machine_info: dict thông tin máy (hostname, mac, os)
-        """
-        if self.users.find_one({"username": username}):
-            return False, "Tên đăng nhập đã tồn tại!"
-        if role in ["admin", "tester"] and creator_role != "admin":
-            return False, "Chỉ admin mới tạo được tài khoản admin/tester."
-        now = datetime.utcnow()
-        user_doc = {
-            "username": username,
-            "password": self.hash_password(password),
-            "role": role,
-            "created_at": now,
-        }
-        if machine_info:
-            user_doc["machine_info"] = machine_info
-        if role == "user":
-            user_doc["expired_at"] = now + timedelta(days=3)
-        self.users.insert_one(user_doc)
-        return True, "Đăng ký thành công!"
-
-    def login(self, username, password):
-        user = self.users.find_one({"username": username})
-        if not user:
-            return False, "Sai tên đăng nhập hoặc mật khẩu!", None
-        if user["password"] != self.hash_password(password):
-            return False, "Sai tên đăng nhập hoặc mật khẩu!", None
-        # Kiểm tra hạn sử dụng nếu là user
-        if user["role"] == "user":
-            expired = user.get("expired_at")
-            if not expired:
-                # Nếu chưa có expired_at, fallback về created_at + 3 ngày
-                created = user.get("created_at")
-                if not created:
-                    return False, "Tài khoản không hợp lệ!", None
-                if isinstance(created, str):
-                    created = datetime.fromisoformat(created)
-                expired = created + timedelta(days=3)
-            if isinstance(expired, str):
-                expired = datetime.fromisoformat(expired)
-            if datetime.utcnow() > expired:
-                return False, "Tài khoản user đã hết hạn sử dụng (3 ngày)!", None
-        return True, "Đăng nhập thành công!", user["role"]
-
-    def get_user(self, username):
-        return self.users.find_one({"username": username})
-
-    def set_role(self, username, new_role, admin_username):
-        admin = self.get_user(admin_username)
-        if not admin or admin["role"] != "admin":
-            return False, "Chỉ admin mới được đổi quyền."
-        if new_role not in ["admin", "tester", "user"]:
-            return False, "Role không hợp lệ."
-        self.users.update_one({"username": username}, {"$set": {"role": new_role}})
-        return True, "Đã đổi quyền thành công."
-
-    def list_users(self):
-        return list(self.users.find({}, {"_id": 0, "password": 0}))
-
-    def login_flex(self, username, password):
-        """Flexible login: SHA256 or bcrypt"""
-        user = self.users.find_one({"username": username})
-        if not user:
-            return False, "Sai tên đăng nhập hoặc mật khẩu!", None
-
-        # Try SHA256 first (native)
-        if user.get("password") == self.hash_password(password):
-            success_msg = "Đăng nhập thành công!"
-        # Try bcrypt legacy
-        elif self.verify_bcrypt(password, user.get("bcrypt_password", "")):
-            success_msg = "Đăng nhập legacy thành công!"
-        else:
-            return False, "Sai tên đăng nhập hoặc mật khẩu!", None
-
-        # Check expiration
-        if user["role"] == "user":
-            expired = user.get("expired_at")
-            if not expired:
-                created = user.get("created_at")
-                if not created:
-                    return False, "Tài khoản không hợp lệ!", None
-                if isinstance(created, str):
-                    created = datetime.fromisoformat(created)
-                expired = created + timedelta(days=3)
-            if isinstance(expired, str):
-                expired = datetime.fromisoformat(expired)
-            if datetime.utcnow() > expired:
-                return False, "Tài khoản user đã hết hạn sử dụng (3 ngày)!", None
-
-        # Return role + profile data
-        profile = {
-            "role": user.get("role"),
-            "display_name": user.get("display_name", username),
-            "sheets_config": user.get("sheets_config", []),
-            "avatar_path": user.get("avatar_path")
-        }
-        return True, success_msg, profile
-
-    def register_profile(self, username, password, display_name, sheets_config=[], role="user", avatar_path=None, creator_role=None, machine_info=None):
-        """Register with profile data"""
-        if self.users.find_one({"username": username}):
-            return False, "Tên đăng nhập đã tồn tại!"
-        if role in ["admin", "tester"] and creator_role != "admin":
-            return False, "Chỉ admin mới tạo được tài khoản admin/tester."
-        now = datetime.utcnow()
-        user_doc = {
-            "username": username,
-            "password": self.hash_password(password),
-            "bcrypt_password": base64.b64encode(self.hash_bcrypt(password)).decode('ascii'),
-            "role": role,
-            "display_name": display_name,
-            "sheets_config": sheets_config,
-            "avatar_path": avatar_path,
-            "created_at": now,
-        }
-        if machine_info:
-            user_doc["machine_info"] = machine_info
-        if role == "user":
-            user_doc["expired_at"] = now + timedelta(days=3)
-        self.users.insert_one(user_doc)
-        return True, "Đăng ký thành công!"
-
-    def update_profile(self, username, display_name, sheets_config, avatar_path=None, old_password=None, new_password=None):
-        """Update user profile"""
-        user = self.users.find_one({"username": username})
-        if not user:
-            return False, "User not found"
-
-        updates = {
-            "display_name": display_name.strip(),
-            "sheets_config": sheets_config
-        }
-        if avatar_path:
-            updates["avatar_path"] = avatar_path
-
-        if new_password:
-            if not old_password or (user["password"] != self.hash_password(old_password) and not self.verify_bcrypt(old_password, user.get("bcrypt_password", ""))):
-                return False, "Mật khẩu cũ không đúng"
-            hashed_new = self.hash_password(new_password)
-            bcrypt_new = base64.b64encode(self.hash_bcrypt(new_password)).decode('ascii')
-            updates["password"] = hashed_new
-            updates["bcrypt_password"] = bcrypt_new
-
-        self.users.update_one({"username": username}, {"$set": updates})
-        return True, "Cập nhật thành công"
-
-    def migrate_from_json(self):
-        """Migrate users.json to MongoDB"""
-        users_file = "users.json"
-        if not os.path.exists(users_file):
-            print("No users.json found")
-            return
-        try:
-            with open(users_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            json_users = data.get('users', [])
-            migrated = 0
-            for u in json_users:
-                username = u['username']
-                # Upsert with bcrypt hash preserved
-                self.users.update_one(
-                    {"username": username},
-                    {"$set": {
-                        "username": username,
-                        "bcrypt_password": u['hashed_password'],
-                        "display_name": u.get('display_name', username),
-                        "sheets_config": u.get('sheets_config', []),
-                        "avatar_path": u.get('avatar_path'),
-                        "role": u.get('role', 'user'),
-                        "migrated_at": datetime.utcnow()
-                    }},
-                    upsert=True
-                )
-                migrated += 1
-            print(f"Migrated {migrated} users from JSON")
-        except Exception as e:
-            print(f"Migration error: {e}")
-
-class SessionsManager:
-    def __init__(self, db_name="checktop_app"):
-        self.db = DatabaseConnection().get_database(db_name)
-        self.sessions = self.db["sessions"]
-        self.auth_sessions = self.db["auth_sessions"]
-        # Create TTL index for auth_sessions (24 hours)
-        try:
-            self.auth_sessions.create_index("created_at", expireAfterSeconds=86400)
-        except:
-            pass  # Index might already exist
-
-    def save_auth_state(self, user_id):
-        """Save auth state with 24h TTL"""
-        self.auth_sessions.update_one(
-            {"user_id": user_id},
-            {"$set": {"user_id": user_id, "created_at": datetime.utcnow()}},
-            upsert=True
-        )
-
-    def load_auth_state(self, user_id):
-        """Load auth state - returns dict if exists, None if expired/not found"""
-        doc = self.auth_sessions.find_one({"user_id": user_id})
-        return doc if doc else None
-
-    def save_session(self, user_id, session_data):
-        """Save session data"""
+    def save_marked_keywords(self, user_id, keywords):
+        """Save user marked keywords as list of [keyword, day]"""
         self.sessions.update_one(
             {"user_id": user_id},
-            {"$set": {"user_id": user_id, "data": session_data, "updated_at": datetime.utcnow()}},
+            {"$set": {"marked_keywords": keywords, "updated_at": datetime.utcnow()}},
             upsert=True
         )
 
-    def load_session(self, user_id):
-        """Load session data"""
+    def load_marked_keywords(self, user_id):
+        """Load user marked keywords"""
         doc = self.sessions.find_one({"user_id": user_id})
-        return doc.get("data", {}) if doc else {}
+        return doc.get("marked_keywords", []) if doc else []
 
     def clear_user_sessions(self, user_id):
         """Clear all sessions for user"""
         self.sessions.delete_one({"user_id": user_id})
         self.auth_sessions.delete_one({"user_id": user_id})
+
+
+

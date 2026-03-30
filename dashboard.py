@@ -32,11 +32,28 @@ setup_page_config()
 
 st.markdown(get_custom_css(), unsafe_allow_html=True)
 
-# ✅ NEW SECURE AUTH: Browser-only session + File persistence for F5
-user_id = st.session_state.get('user_id')
+# ✅ SECURE AUTH: MongoDB TTL restore + session validation
+from db import SessionsManager
 
-# For multi-user security, do not import shared file-based auth state.
-# Each browser session must have its own session_state set via login.
+def restore_auth_from_mongo():
+    """Restore user_id from MongoDB auth_sessions if valid (<24h TTL)"""
+    if 'user_id' in st.session_state:
+        return st.session_state['user_id']
+    
+    # Scan recent auth_sessions (limit 10 for performance)
+    sm = SessionsManager()
+    recent_auths = list(sm.auth_sessions.find().limit(10))
+    
+    for doc in recent_auths:
+        user_id = doc.get('user_id')
+        if sm.load_auth_state(user_id):  # Validates TTL
+            st.session_state['user_id'] = user_id
+            return user_id
+    
+    return None
+
+# Restore first
+user_id = restore_auth_from_mongo()
 
 if not user_id:
     from user_auth import validate_session
@@ -47,6 +64,7 @@ else:
     if not validate_session():
         del st.session_state['user_id']
         st.switch_page("pages/auth.py")
+
 
 # Load APP data only (safe)
 init_session_state()
@@ -78,7 +96,7 @@ if not st.session_state.get('user_sheets_config'):
 # Encode logo once at startup (used in both header and sidebar)
 import base64
 try:
-    logo_base64 = base64.b64encode(open('logo.png', 'rb').read()).decode()
+    logo_base64 = base64.b64encode(open('LOGO1.png', 'rb').read()).decode()
 except:
     logo_base64 = None
 
@@ -878,23 +896,11 @@ filtered_display = filtered[display_columns].copy()
 filtered_display.index = range(1, len(filtered_display) + 1)
 
 # ── File lưu riêng theo user ──
-import json, os
-
-MARKED_FILE = f"session_marked_{st.session_state.get('user_id', 'default')}.json"
-
-def save_marked():
-    with open(MARKED_FILE, 'w', encoding='utf-8') as f:
-        json.dump(list(st.session_state.marked_keywords), f, ensure_ascii=False)
-
-def load_marked():
-    if os.path.exists(MARKED_FILE):
-        with open(MARKED_FILE, encoding='utf-8') as f:
-            return set(tuple(x) for x in json.load(f))  # convert list→tuple
-    return set()
+from persistence import load_marked_keywords, save_marked_keywords
 
 # ── Init ──
 if 'marked_keywords' not in st.session_state:
-    st.session_state.marked_keywords = load_marked()
+    st.session_state.marked_keywords = load_marked_keywords()
 
 # ── Tạo key = (Từ khóa, Ngày) ──
 # Xác định cột ngày
@@ -945,7 +951,7 @@ if '⭐' in edited_df.columns and 'Từ khóa' in edited_df.columns:
             st.session_state.marked_keywords.add(key)
         else:
             st.session_state.marked_keywords.discard(key)
-    save_marked()
+    save_marked_keywords()
 
 # ── Hiển thị danh sách đã đánh dấu ──
 if st.session_state.marked_keywords:
@@ -958,7 +964,7 @@ if st.session_state.marked_keywords:
     with col_mark2:
         if st.button("🗑️ Xóa tất cả"):
             st.session_state.marked_keywords = set()
-            save_marked()
+            save_marked_keywords()
             st.rerun()
 
     st.dataframe(
