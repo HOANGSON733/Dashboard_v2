@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from user_auth import login_user, register_user, logout, is_authenticated
 from config import setup_page_config
 from persistence import save_session_state, clear_all_session_files, init_session_state, save_auth_state, save_auth_state_file
-import extra_streamlit_components as stx
+from streamlit_cookies_controller import CookieController
 import secrets
 from db import SessionsManager
 setup_page_config()
@@ -305,7 +305,7 @@ div[data-testid="element-container"] { margin: 0 !important; padding: 0 !importa
 }
 </style>
 """, unsafe_allow_html=True)
-cookie_manager = stx.CookieManager(key="auth_cookies")
+cookie_manager = CookieController()
 # ── Image helpers ──────────────────────────────────────────────────────────────
 def img_b64(path: str) -> str:
     p = pathlib.Path(path)

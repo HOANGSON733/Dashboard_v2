@@ -1,3 +1,4 @@
+# db.py - Lớp quản lý kết nối MongoDB và các thao tác CRUD cho users, sessions, domains.
 
 import pymongo, os
 import threading

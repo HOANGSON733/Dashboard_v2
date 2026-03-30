@@ -13,3 +13,4 @@ streamlit-echarts
 pymongo
 python-dotenv
 extra-streamlit-components
+streamlit-cookies-controller

@@ -26,13 +26,13 @@ from ui_dubao import render_dubao
 from ui_snapshots import render_snapshots
 from ui_lichnhiet import render_lichnhiet
 from ui_ga import render_ga_ui
-import extra_streamlit_components as stx
+from streamlit_cookies_controller import CookieController
 from db import SessionsManager
 
 
 # ===================== INITIALIZE =====================
 setup_page_config()
-cookie_manager = stx.CookieManager(key="auth_cookies")  # ← phải đặt TRƯỚC st.markdown
+cookie_manager = CookieController()  
 st.markdown(get_custom_css(), unsafe_allow_html=True)
 
 # ===================== AUTH =====================
