@@ -26,97 +26,42 @@ from ui_dubao import render_dubao
 from ui_snapshots import render_snapshots
 from ui_lichnhiet import render_lichnhiet
 from ui_ga import render_ga_ui
+import extra_streamlit_components as stx
+from db import SessionsManager
+
 
 # ===================== INITIALIZE =====================
 setup_page_config()
-
+cookie_manager = stx.CookieManager(key="auth_cookies")  # ← phải đặt TRƯỚC st.markdown
 st.markdown(get_custom_css(), unsafe_allow_html=True)
 
-# ✅ SECURE AUTH: MongoDB TTL restore + session validation
-from db import SessionsManager
-import secrets
-
-def get_or_create_session_token():
-    """Mỗi browser tab có 1 token riêng, lưu trong session_state"""
-    if 'session_token' not in st.session_state:
-        st.session_state.session_token = secrets.token_hex(32)
-    return st.session_state.session_token
-
-# Xóa hàm restore_auth_from_mongo() đi hoàn toàn
-# Thay bằng:
-session_token = get_or_create_session_token()
-
-if 'user_id' not in st.session_state:
-    st.switch_page("pages/auth.py")
-
-user_id = st.session_state.get('user_id')
-
-# Validate session vẫn còn hợp lệ trong MongoDB
-from user_auth import validate_session
-if not validate_session():
-    del st.session_state['user_id']
-    st.switch_page("pages/auth.py")
+# ===================== AUTH =====================
+def restore_auth_from_cookie():
+    if 'user_id' in st.session_state:
+        return st.session_state['user_id']
     
+    token = cookie_manager.get("session_token")
+    if not token:
+        return None
     
-# def restore_auth_from_mongo():
-#     """Restore user_id from MongoDB auth_sessions if valid (<24h TTL)"""
-#     if 'user_id' in st.session_state:
-#         return st.session_state['user_id']
+    user_id = SessionsManager().get_user_by_token(token)
+    if not user_id:
+        cookie_manager.delete("session_token")
+        return None
     
-#     # Scan recent auth_sessions (limit 10 for performance)
-#     sm = SessionsManager()
-#     recent_auths = list(sm.auth_sessions.find().limit(10))
+    from user_auth import UserManager
+    user_doc = UserManager().get_user(user_id)
+    if user_doc:
+        st.session_state['user_id'] = user_id
+        st.session_state['session_token'] = token
+        st.session_state['user_sheets_config'] = user_doc.get('sheets_config', [])
+        st.session_state['display_name'] = user_doc.get('display_name', user_id)
+        st.session_state['avatar_path'] = user_doc.get('avatar_path')
     
-#     for doc in recent_auths:
-#         user_id = doc.get('user_id')
-#         if sm.load_auth_state(user_id):  # Validates TTL
-#             st.session_state['user_id'] = user_id
-#             return user_id
-    
-#     return None
+    return user_id
 
-# Restore first
-# user_id = restore_auth_from_mongo()
+user_id = restore_auth_from_cookie()
 
-# if not user_id:
-    # from user_auth import validate_session
-    # if not validate_session():
-    #     st.switch_page("pages/auth.py")
-# else:
-#     from user_auth import validate_session
-#     if not validate_session():
-#         del st.session_state['user_id']
-#         st.switch_page("pages/auth.py")
-
-
-# # Load APP data only (safe)
-# init_session_state()
-
-# # ✅ Restore config if missing (including empty value)
-# if not st.session_state.get('user_sheets_config'):
-#     from user_auth import UserManager
-#     um = UserManager()
-#     user_doc = um.get_user(user_id)
-#     if user_doc:
-#         st.session_state.user_sheets_config = user_doc.get('sheets_config', []) or []
-#         st.session_state.display_name = user_doc.get('display_name', user_id)
-
-# # Clear stale avatar
-# # Safe sync avatar from DB
-#     try:                         
-#         from user_auth import UserManager
-#         um = UserManager()
-#         user_doc = um.users.find_one({'username': st.session_state.user_id})
-#         if user_doc:
-#             st.session_state.avatar_path = user_doc.get('avatar_path')
-#     except:
-#         pass
-
-# col_left, col_right = st.columns([4,1])
-# with col_right:
-#     st.page_link("pages/profile.py", label="👤 Profile", icon="👤")
-
-# Encode logo once at startup (used in both header and sidebar)
 import base64
 try:
     logo_base64 = base64.b64encode(open('LOGO1.png', 'rb').read()).decode()

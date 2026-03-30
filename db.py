@@ -135,6 +135,13 @@ class UserManager:
 
     def list_users(self):
         return list(self.users.find({}, {"_id": 0, "password": 0}))
+    
+       # Thêm vào class UserManager trong db.py
+    def get_user(self, username):
+        """Lấy thông tin user theo username"""
+        return self.users.find_one({"username": username}, {"_id": 0, "password": 0})
+
+
 class SessionsManager:
     """Quản lý session data per user (goals, snapshots, etc.)"""
     def __init__(self, db_name="checktop_app"):
@@ -200,6 +207,35 @@ class SessionsManager:
         """Clear all sessions for user"""
         self.sessions.delete_one({"user_id": user_id})
         self.auth_sessions.delete_one({"user_id": user_id})
+    # Thêm vào class SessionsManager trong db.py
 
+    def save_session_token(self, token: str, user_id: str, ttl_hours: int = 72):
+        """Lưu session token → user_id mapping, TTL 72h"""
+        from datetime import datetime, timedelta
+        self.db['session_tokens'].update_one(
+            {'token': token},
+            {'$set': {
+                'token': token,
+                'user_id': user_id,
+                'expires_at': datetime.utcnow() + timedelta(hours=ttl_hours)
+            }},
+            upsert=True
+        )
+        # Tạo TTL index nếu chưa có
+        self.db['session_tokens'].create_index(
+            'expires_at', expireAfterSeconds=0
+        )
 
+    def get_user_by_token(self, token: str):
+        """Lấy user_id từ token, None nếu hết hạn hoặc không tồn tại"""
+        from datetime import datetime
+        doc = self.db['session_tokens'].find_one({
+            'token': token,
+            'expires_at': {'$gt': datetime.utcnow()}
+        })
+        return doc['user_id'] if doc else None
 
+    def delete_session_token(self, token: str):
+        """Xóa token khi logout"""
+        self.db['session_tokens'].delete_one({'token': token})
+ 

@@ -5,7 +5,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from user_auth import login_user, register_user, logout, is_authenticated
 from config import setup_page_config
 from persistence import save_session_state, clear_all_session_files, init_session_state, save_auth_state, save_auth_state_file
-
+import extra_streamlit_components as stx
+import secrets
+from db import SessionsManager
 setup_page_config()
 
 st.markdown("""
@@ -303,7 +305,7 @@ div[data-testid="element-container"] { margin: 0 !important; padding: 0 !importa
 }
 </style>
 """, unsafe_allow_html=True)
-
+cookie_manager = stx.CookieManager(key="auth_cookies")
 # ── Image helpers ──────────────────────────────────────────────────────────────
 def img_b64(path: str) -> str:
     p = pathlib.Path(path)
@@ -380,20 +382,27 @@ with right_col:
             if st.button("Đăng Nhập", key="btn_login"):
                 success, user_config = login_user(username, password)
                 if success:
-                    st.session_state.user_id            = username
-                    st.session_state.display_name       = user_config.get("display_name", username)
+                    # Tạo token mới
+                    token = secrets.token_hex(32)
+                    
+                    # Lưu token vào MongoDB
+                    from db import SessionsManager
+                    SessionsManager().save_session_token(token, username, ttl_hours=72)
+                    
+                    # Lưu token vào cookie browser (72h)
+                    cookie_manager.set("session_token", token, max_age=72*3600)
+                    
+                    # Set session state như cũ
+                    st.session_state.user_id = username
+                    st.session_state.display_name = user_config.get("display_name", username)
                     st.session_state.user_sheets_config = user_config["sheets_config"]
-                    # ✅ Clear then set avatar post-login (F5-safe)
-                    if 'avatar_path' in st.session_state:
-                        del st.session_state['avatar_path']
                     st.session_state.avatar_path = user_config.get('avatar_path')
-                    save_auth_state(username)
+                    st.session_state.session_token = token
+                    
                     save_session_state()
                     init_session_state()
                     st.success("✅ Đăng nhập thành công!")
                     st.switch_page("dashboard.py")
-                else:
-                    st.error(f"❌ {user_config}")
 
         # ── ĐĂNG KÝ ────────────────────────────
         with tab_register:
@@ -459,6 +468,10 @@ with right_col:
                     if success:
                         succ, user_config = login_user(new_username, new_password)
                         if succ:
+                            token = secrets.token_hex(32)
+                            SessionsManager().save_session_token(token, new_username, ttl_hours=72)
+                            cookie_manager.set("session_token", token, max_age=72*3600)
+                            
                             st.session_state.user_id            = new_username
                             st.session_state.display_name       = user_config.get("display_name", new_username)
                             st.session_state.user_sheets_config = user_config["sheets_config"]

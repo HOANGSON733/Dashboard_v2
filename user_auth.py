@@ -99,15 +99,20 @@ def update_user(username, new_display_name=None, new_sheets_config=None, avatar=
     return result
 
 def logout():
-    """Logout current user"""
+    """Logout: xóa token DB + session state"""
     user_id = st.session_state.get('user_id')
+    token = st.session_state.get('session_token')
+    
+    if token:
+        SessionsManager().delete_session_token(token)
     if user_id:
         SessionsManager().clear_user_sessions(user_id)
-    # Clear session state
-    for key in ['user_id', 'user_sheets_config', 'user_domains', 'avatar_path', 'display_name']:
+    
+    for key in ['user_id', 'user_sheets_config', 'user_domains', 
+                'avatar_path', 'display_name', 'session_token']:
         if key in st.session_state:
             del st.session_state[key]
-
+            
 def get_user_domains():
     """
     Get current user's domains from session.

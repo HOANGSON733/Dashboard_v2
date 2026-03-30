@@ -12,3 +12,4 @@ bcrypt==4.2.0
 streamlit-echarts
 pymongo
 python-dotenv
+pip install extra-streamlit-components
