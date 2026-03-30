@@ -11,7 +11,7 @@ from datetime import datetime
 # Import modules
 from config import setup_page_config, get_custom_css, ANALYSIS_MODES
 from auth import init_sheets_client
-from persistence import save_session_state, init_session_state, clear_all_session_files, load_auth_state
+from persistence import save_session_state, init_session_state, clear_all_session_files, load_auth_state, load_marked_keywords, save_marked_keywords
 from data_loader import load_sheet_data_cached, get_available_days, apply_filters, get_date_range_days
 # from sheets_config import SHEETS  # Removed: now per-user
 
@@ -34,60 +34,83 @@ st.markdown(get_custom_css(), unsafe_allow_html=True)
 
 # ✅ SECURE AUTH: MongoDB TTL restore + session validation
 from db import SessionsManager
+import secrets
 
-def restore_auth_from_mongo():
-    """Restore user_id from MongoDB auth_sessions if valid (<24h TTL)"""
-    if 'user_id' in st.session_state:
-        return st.session_state['user_id']
+def get_or_create_session_token():
+    """Mỗi browser tab có 1 token riêng, lưu trong session_state"""
+    if 'session_token' not in st.session_state:
+        st.session_state.session_token = secrets.token_hex(32)
+    return st.session_state.session_token
+
+# Xóa hàm restore_auth_from_mongo() đi hoàn toàn
+# Thay bằng:
+session_token = get_or_create_session_token()
+
+if 'user_id' not in st.session_state:
+    st.switch_page("pages/auth.py")
+
+user_id = st.session_state.get('user_id')
+
+# Validate session vẫn còn hợp lệ trong MongoDB
+from user_auth import validate_session
+if not validate_session():
+    del st.session_state['user_id']
+    st.switch_page("pages/auth.py")
     
-    # Scan recent auth_sessions (limit 10 for performance)
-    sm = SessionsManager()
-    recent_auths = list(sm.auth_sessions.find().limit(10))
     
-    for doc in recent_auths:
-        user_id = doc.get('user_id')
-        if sm.load_auth_state(user_id):  # Validates TTL
-            st.session_state['user_id'] = user_id
-            return user_id
+# def restore_auth_from_mongo():
+#     """Restore user_id from MongoDB auth_sessions if valid (<24h TTL)"""
+#     if 'user_id' in st.session_state:
+#         return st.session_state['user_id']
     
-    return None
+#     # Scan recent auth_sessions (limit 10 for performance)
+#     sm = SessionsManager()
+#     recent_auths = list(sm.auth_sessions.find().limit(10))
+    
+#     for doc in recent_auths:
+#         user_id = doc.get('user_id')
+#         if sm.load_auth_state(user_id):  # Validates TTL
+#             st.session_state['user_id'] = user_id
+#             return user_id
+    
+#     return None
 
 # Restore first
-user_id = restore_auth_from_mongo()
+# user_id = restore_auth_from_mongo()
 
-if not user_id:
-    from user_auth import validate_session
-    if not validate_session():
-        st.switch_page("pages/auth.py")
-else:
-    from user_auth import validate_session
-    if not validate_session():
-        del st.session_state['user_id']
-        st.switch_page("pages/auth.py")
+# if not user_id:
+    # from user_auth import validate_session
+    # if not validate_session():
+    #     st.switch_page("pages/auth.py")
+# else:
+#     from user_auth import validate_session
+#     if not validate_session():
+#         del st.session_state['user_id']
+#         st.switch_page("pages/auth.py")
 
 
-# Load APP data only (safe)
-init_session_state()
+# # Load APP data only (safe)
+# init_session_state()
 
-# ✅ Restore config if missing (including empty value)
-if not st.session_state.get('user_sheets_config'):
-    from user_auth import UserManager
-    um = UserManager()
-    user_doc = um.get_user(user_id)
-    if user_doc:
-        st.session_state.user_sheets_config = user_doc.get('sheets_config', []) or []
-        st.session_state.display_name = user_doc.get('display_name', user_id)
+# # ✅ Restore config if missing (including empty value)
+# if not st.session_state.get('user_sheets_config'):
+#     from user_auth import UserManager
+#     um = UserManager()
+#     user_doc = um.get_user(user_id)
+#     if user_doc:
+#         st.session_state.user_sheets_config = user_doc.get('sheets_config', []) or []
+#         st.session_state.display_name = user_doc.get('display_name', user_id)
 
-# Clear stale avatar
-# Safe sync avatar from DB
-    try:
-        from user_auth import UserManager
-        um = UserManager()
-        user_doc = um.users.find_one({'username': st.session_state.user_id})
-        if user_doc:
-            st.session_state.avatar_path = user_doc.get('avatar_path')
-    except:
-        pass
+# # Clear stale avatar
+# # Safe sync avatar from DB
+#     try:                         
+#         from user_auth import UserManager
+#         um = UserManager()
+#         user_doc = um.users.find_one({'username': st.session_state.user_id})
+#         if user_doc:
+#             st.session_state.avatar_path = user_doc.get('avatar_path')
+#     except:
+#         pass
 
 # col_left, col_right = st.columns([4,1])
 # with col_right:

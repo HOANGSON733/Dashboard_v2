@@ -1,4 +1,5 @@
 """
+persistence.py - Lớp quản lý lưu và tải trạng thái phiên làm việc của người dùng từ MongoDB.
 Lưu và tải trạng thái phiên làm việc
 """
 
