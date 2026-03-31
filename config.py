@@ -72,26 +72,14 @@ def get_custom_css():
         background: #764ba2;
     }
     
-    [data-testid="stSidebarNav"] {
+    /* Hide specific pages from sidebar nav */
+    section[data-testid="stSidebarNav"] a[href*="/pages/auth"],
+    section[data-testid="stSidebarNav"] a[href*="/pages/profile"],
+    section[data-testid="stSidebarNav"] a[href="/dashboard"] {
         display: none !important;
     }
     
-    /* Hide default top navbar/header completely */
-    section[data-testid="stHeader"] {
-        display: none !important;
-    }
-    header[data-testid="stHeader"] {
-        display: none !important;
-    }
-    .st-emotion-cache-1me7uk0 {
-        display: none !important;
-    }
-    .stAppViewContainer {
-        padding-top: 0rem !important;
-    }
-    .block-container {
-        padding-top: 1rem !important;
-    }
+    /* Navbar enabled, auth/profile/dashboard hidden */
 </style>
     """
     return css

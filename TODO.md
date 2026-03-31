@@ -1,16 +1,13 @@
-# ImportError Fix COMPLETE ✅
+# TODO: Hide Dashboard/Auth/Profile from Sidebar
 
-**Summary:**
-- Moved persistence imports to top → no late import crashes
-- Added `if 'user_id' in st.session_state` + try/except guards
-- persistence.py reviewed: user_id guards already strong (returns empty set)
+**Status**: 🔄 In Progress
 
-**Status:**
-- ✅ Local syntax fixed, Streamlit runs
-- ✅ Deployment-safe (no late imports/DB during rerun)
+## Approved Plan Breakdown:
+### 1. ✅ Create TODO.md
+### 2. ✅ Edit dashboard.py - Hide nav links + enhance toggle
+### 3. ✅ Edit config.py - Global CSS for nav hiding
+### 4. Test: streamlit run dashboard.py
+### 5. Update TODO.md & complete
 
-**Final Steps (user action):**
-1. `streamlit run dashboard.py` → test mark/unmark keywords
-2. Push to GitHub → auto-deploy Streamlit Cloud
+**Next**: Edit files per plan.
 
-Error resolved. App ready.

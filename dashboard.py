@@ -640,7 +640,7 @@ with col_right:
         box-shadow: 0 0 0 3px rgba(59,130,246,.35);
         border-radius: 50%;
     }}
-    z
+    
     
     
     </style>
