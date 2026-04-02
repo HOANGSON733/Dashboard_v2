@@ -1,4 +1,5 @@
 """
+dashboard.py
 SEO Rank Dashboard Pro - Main Application
 """
 
@@ -137,123 +138,10 @@ if 'sidebar_collapsed' not in st.session_state:
 
 if logo_base64:
     st.sidebar.markdown(f"""
-        <style>
-            [data-testid="stSidebar"] > div:first-child {{ padding-top: 0rem !important;margin-bottom: -10rem !important; }}
-            .sidebar-logo {{ 
-                display: flex; 
-                justify-content: center; 
-                transform: translateY(-50px);
-            }}
-            .sidebar-logo img {{
-                width: 180px;
-                border-radius: 12px;
-            }}
-            [data-testid="stSidebar"] nav a[href*="/pages/auth"], 
-            [data-testid="stSidebar"] nav a[href="/dashboard"],
-            [data-testid="stSidebarNav"] {{
-                display: none !important;
-            }}
-        </style>
-        <div class='sidebar-logo'>
-            <img src='data:image/png;base64,{logo_base64}' alt='Logo'>
+        <div style='display:flex; justify-content:center; margin-bottom:-2rem; margin-top:0.5rem;'>
+            <img src='data:image/png;base64,{logo_base64}' alt='Logo' style='width:180px; border-radius:12px; transform: translateY(-60px);'>
         </div>
     """, unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
-
-section[data-testid="stSidebar"] {
-    background: linear-gradient(160deg, #0c3cbf 0%, #1557d4 50%, #0b2e9e 100%) !important;
-    width: 18rem !important;
-}
-section[data-testid="stSidebar"]::before {
-    content: '';
-    position: absolute; inset: 0; pointer-events: none; z-index: 0;
-    background-image:
-        linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
-    background-size: 36px 36px;
-}
-section[data-testid="stSidebar"] > div { position: relative; z-index: 1; }
-section[data-testid="stSidebar"] * {
-    color: rgba(255,255,255,.85) !important;
-    font-family: 'Be Vietnam Pro', sans-serif !important;
-}
-section[data-testid="stSidebar"] p strong,
-section[data-testid="stSidebar"] .stMarkdown strong {
-    font-size: 10px !important;
-    font-weight: 700 !important;
-    letter-spacing: 1.2px !important;
-    text-transform: uppercase !important;
-    color: rgba(255,255,255,.5) !important;
-}
-section[data-testid="stSidebar"] [data-testid="stSelectbox"] > div > div {
-    background: rgba(255,255,255,.15) !important;
-    border: 1.5px solid rgba(255,255,255,.4) !important;
-    border-radius: 10px !important;
-}
-section[data-testid="stSidebar"] [data-testid="stSelectbox"] > div > div > div {
-    color: #ffffff !important;
-    font-weight: 500 !important;
-    font-size: 13px !important;
-}
-section[data-testid="stSidebar"] [data-testid="stSelectbox"] svg { fill: rgba(255,255,255,.7) !important; }
-section[data-testid="stSidebar"] .stSelectbox, section[data-testid="stSidebar"] .stSelectbox * { color: #ffffff !important; }
-div[data-baseweb="popover"] ul, div[data-baseweb="menu"] {
-    background: #1a4fd6 !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,.3) !important;
-}
-div[data-baseweb="menu"] li {
-    background: transparent !important; color: #ffffff !important;
-    border-radius: 8px !important; margin: 2px 0 !important;
-    padding: 8px 12px !important; font-size: 13px !important;
-}
-div[data-baseweb="menu"] li *, div[data-baseweb="menu"] li span, div[data-baseweb="menu"] li div { color: #ffffff !important; }
-div[data-baseweb="menu"] li:hover { background: rgba(255,255,255,.15) !important; }
-div[data-baseweb="menu"] li[aria-selected="true"] { background: rgba(255,255,255,.28) !important; font-weight: 600 !important; }
-section[data-testid="stSidebar"] [data-testid="stDateInput"] input {
-    background: transparent !important; border: none !important;
-    color: #fff !important; font-weight: 600 !important; font-size: 13px !important;
-}
-section[data-testid="stSidebar"] [data-testid="stCheckbox"] label {
-    background: transparent !important; border: none !important; box-shadow: none !important;
-}
-section[data-testid="stSidebar"] [data-testid="stRadio"] label {
-    background: transparent !important; border-radius: 9px !important;
-    padding: 8px 12px !important; transition: background .15s !important;
-}
-section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover { background: rgba(255,255,255,.1) !important; }
-section[data-testid="stSidebar"] [data-testid="stTextInput"] input {
-    background: rgba(255,255,255,.12) !important;
-    border: 1px solid rgba(255,255,255,.22) !important;
-    border-radius: 8px !important; color: #fff !important;
-}
-section[data-testid="stSidebar"] button {
-    background: rgba(255,255,255,.15) !important;
-    border: 1px solid rgba(255,255,255,.25) !important;
-    border-radius: 10px !important; color: #fff !important;
-    font-weight: 600 !important; font-size: 13px !important;
-}
-section[data-testid="stSidebar"] button:hover { background: rgba(255,255,255,.25) !important; }
-section[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,.15) !important; }
-section[data-testid="stSidebar"] details {
-    background: rgba(255,255,255,.1) !important;
-    border: 1px solid rgba(255,255,255,.18) !important;
-    border-radius: 10px !important;
-}
-section[data-testid="stSidebar"] [data-baseweb="input"],
-section[data-testid="stSidebar"] [data-baseweb="base-input"] {
-    background: rgba(255,255,255,.12) !important;
-    border: 1px solid rgba(255,255,255,.22) !important;
-    border-radius: 8px !important;
-}
-section[data-testid="stSidebar"] [data-baseweb="input"] input,
-section[data-testid="stSidebar"] [data-baseweb="base-input"] input {
-    background: transparent !important; color: #fff !important;
-}
-</style>
-""", unsafe_allow_html=True)
 
 # ===================== HEADER =====================
 col_left, col_right = st.columns([4, 1])
