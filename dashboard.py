@@ -33,36 +33,52 @@ st.markdown(get_custom_css(), unsafe_allow_html=True)
 
 # ===================== AUTH =====================
 def restore_auth_from_cookie():
-    # 1. Đã có user_id trong session → dùng luôn
+    """Restore auth silently with cookie priority"""
+    # 1. Session already has user_id
     if st.session_state.get("user_id"):
         return st.session_state["user_id"]
 
-    # 2. Thử đọc token từ cookie
     token = None
+    
+    # 2. PRIORITY: Cookie (persists across restarts)
     try:
         token = cookie_manager.get("session_token")
     except Exception:
         pass
-
-    # 3. Fallback: token lưu trong session_state (sau login)
+    
+    # 3. Fallback: session_state  
     if not token:
         token = st.session_state.get("session_token")
 
     if not token:
-        return None
+        return None  # Silent - UI handles gracefully
 
-    # 4. Validate token với MongoDB
+    # 4. Validate token with MongoDB
     try:
         user_id = SessionsManager().get_user_by_token(token)
     except Exception:
+        # Clear invalid cookie
+        try:
+            cookie_manager.delete("session_token")
+        except:
+            pass
         return None
 
     if not user_id:
-        # KHÔNG gọi cookie_manager.delete() — crash trên Streamlit Cloud
+        # Clear invalid storage
+        st.markdown("""
+        <script>
+        localStorage.removeItem('session_token');
+        </script>
+        """, unsafe_allow_html=True)
+        try:
+            cookie_manager.delete("session_token")
+        except:
+            pass
         st.session_state.pop("session_token", None)
         return None
 
-    # 5. Load user profile vào session
+    # 5. Load user profile into session
     try:
         from user_auth import UserManager
         user_doc = UserManager().get_user(user_id)
@@ -72,6 +88,12 @@ def restore_auth_from_cookie():
             st.session_state["user_sheets_config"] = user_doc.get("sheets_config", [])
             st.session_state["display_name"] = user_doc.get("display_name", user_id)
             st.session_state["avatar_path"] = user_doc.get("avatar_path")
+            
+            # ENSURE cookie is set for persistence
+            try:
+                cookie_manager.set("session_token", token, max_age=72*3600)
+            except:
+                pass
         else:
             return None
     except Exception:
@@ -83,15 +105,25 @@ def restore_auth_from_cookie():
 user_id = restore_auth_from_cookie()
 
 if not user_id:
-    retry_count = st.session_state.get("cookie_retry_dash", 0)
-    if retry_count < 5:
-        st.session_state["cookie_retry_dash"] = retry_count + 1
-        st.rerun()
-    else:
-        st.session_state.pop("cookie_retry_dash", None)
+    st.warning("🔄 Session đã hết hạn do refresh trang. Vui lòng đăng nhập lại.")
+    if st.button("Đăng nhập lại"):
         st.switch_page("pages/auth.py")
+    st.stop()
 else:
     st.session_state.pop("cookie_retry_dash", None)
+    # Đảm bảo cookie được set nếu chưa có
+    if st.session_state.get("session_token"):
+        try:
+            existing_token = cookie_manager.get("session_token")
+            if not existing_token:
+                cookie_manager.set("session_token", st.session_state["session_token"], max_age=72*3600)
+        except Exception:
+            pass
+    # Load saved user session state including marked keywords from MongoDB
+    try:
+        init_session_state()
+    except Exception:
+        pass
 
 # ===================== LOGO =====================
 import base64
@@ -436,10 +468,15 @@ from persistence import load_marked_keywords, save_marked_keywords
 if 'marked_keywords' not in st.session_state:
     st.session_state.marked_keywords = load_marked_keywords()
 
+def _normalize_mark_key(keyword, day_value):
+    if isinstance(day_value, (datetime,)):
+        day_value = day_value.strftime("%d-%m-%Y")
+    return (str(keyword).strip(), str(day_value).strip())
+
 ngay_col = 'Ngày' if 'Ngày' in filtered_display.columns else 'Ngày tìm kiếm'
 filtered_display.insert(
     0, '⭐',
-    filtered_display.apply(lambda r: (r['Từ khóa'], str(r[ngay_col])) in st.session_state.marked_keywords, axis=1)
+    filtered_display.apply(lambda r: _normalize_mark_key(r['Từ khóa'], r[ngay_col]) in st.session_state.marked_keywords, axis=1)
 )
 
 st.markdown("""
@@ -468,32 +505,14 @@ edited_df = st.data_editor(
 
 if '⭐' in edited_df.columns and 'Từ khóa' in edited_df.columns:
     for _, row in edited_df.iterrows():
-        key = (row['Từ khóa'], str(row[ngay_col]))
+        key = _normalize_mark_key(row['Từ khóa'], row[ngay_col])
         if row['⭐']:
             st.session_state.marked_keywords.add(key)
         else:
             st.session_state.marked_keywords.discard(key)
     save_marked_keywords()
 
-if st.session_state.marked_keywords:
-    marked_df = filtered_display[filtered_display['⭐'] == True].drop(columns=['⭐'], errors='ignore')
-    col_mark1, col_mark2 = st.columns([6, 1])
-    with col_mark1:
-        st.markdown(f"#### ⭐ Đã đánh dấu ({len(marked_df)})")
-    with col_mark2:
-        if st.button("🗑️ Xóa tất cả"):
-            st.session_state.marked_keywords = set()
-            save_marked_keywords()
-            st.rerun()
-    st.dataframe(
-        marked_df.drop(columns=["Ngày_Sort"], errors='ignore'),
-        use_container_width=True,
-        height=min(300, len(marked_df) * 35 + 40),
-        column_config={
-            "Thứ hạng": st.column_config.NumberColumn("Thứ hạng", format="%d"),
-            "URL": st.column_config.LinkColumn("URL"),
-        }
-    )
+## Không hiển thị thêm bảng 'Đã đánh dấu' theo yêu cầu
 
 csv = filtered.to_csv(index=False).encode('utf-8-sig')
 st.download_button(

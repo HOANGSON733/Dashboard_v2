@@ -17,35 +17,52 @@ from db import SessionsManager
 cookie_manager = CookieController()
 
 def restore_auth():
-    # 1. Đã có user_id → dùng luôn
+    """Sync with dashboard.py - Cookie priority, silent restore"""
+    # 1. Session already has user_id
     if st.session_state.get("user_id"):
         return st.session_state["user_id"]
 
-    # 2. Thử đọc cookie
     token = None
+    
+    # 2. PRIORITY: Cookie (persists across restarts)
     try:
         token = cookie_manager.get("session_token")
     except Exception:
         pass
-
-    # 3. Fallback từ session_state
+    
+    # 3. Fallback: session_state  
     if not token:
         token = st.session_state.get("session_token")
 
     if not token:
-        return None
+        return None  # Silent - UI handles gracefully
 
-    # 4. Validate token
+    # 4. Validate token with MongoDB
     try:
         user_id = SessionsManager().get_user_by_token(token)
     except Exception:
+        # Clear invalid cookie
+        try:
+            cookie_manager.delete("session_token")
+        except:
+            pass
         return None
 
     if not user_id:
+        # Clear invalid storage
+        st.markdown("""
+        <script>
+        localStorage.removeItem('session_token');
+        </script>
+        """, unsafe_allow_html=True)
+        try:
+            cookie_manager.delete("session_token")
+        except:
+            pass
         st.session_state.pop("session_token", None)
         return None
 
-    # 5. Load profile
+    # 5. Load user profile into session
     try:
         from user_auth import UserManager
         user_doc = UserManager().get_user(user_id)
@@ -55,6 +72,12 @@ def restore_auth():
             st.session_state["user_sheets_config"] = user_doc.get("sheets_config", [])
             st.session_state["display_name"] = user_doc.get("display_name", user_id)
             st.session_state["avatar_path"] = user_doc.get("avatar_path")
+            
+            # ENSURE cookie is set for persistence
+            try:
+                cookie_manager.set("session_token", token, max_age=72*3600)
+            except:
+                pass
         else:
             return None
     except Exception:
@@ -66,15 +89,7 @@ def restore_auth():
 user_id = restore_auth()
 
 if not user_id:
-    retry_count = st.session_state.get("cookie_retry_profile", 0)
-    if retry_count < 5:
-        st.session_state["cookie_retry_profile"] = retry_count + 1
-        st.rerun()
-    else:
-        st.session_state.pop("cookie_retry_profile", None)
-        st.switch_page("pages/auth.py")
-else:
-    st.session_state.pop("cookie_retry_profile", None)
+    st.switch_page("pages/auth.py")
 
 init_session_state()
 

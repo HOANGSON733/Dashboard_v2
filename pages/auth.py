@@ -133,19 +133,15 @@ cookie_manager = CookieController()
 
 # ── Xử lý pending cookie (set cookie sau khi login, trước khi redirect) ──────
 if 'pending_cookie_token' in st.session_state:
-    try:
-        cookie_manager.set("session_token", st.session_state['pending_cookie_token'], max_age=72*3600)
-        del st.session_state['pending_cookie_token']
-        st.switch_page("dashboard.py")
-    except Exception:
-        retry = st.session_state.get('cookie_set_retry', 0)
-        if retry < 3:
-            st.session_state['cookie_set_retry'] = retry + 1
-            st.rerun()
-        else:
-            st.session_state.pop('cookie_set_retry', None)
-            st.session_state.pop('pending_cookie_token', None)
-            st.switch_page("dashboard.py")
+    token = st.session_state['pending_cookie_token']
+    # Sử dụng JavaScript để set localStorage thay vì cookie
+    st.markdown(f"""
+    <script>
+    localStorage.setItem('session_token', '{token}');
+    window.location.href = 'dashboard.py';
+    </script>
+    """, unsafe_allow_html=True)
+    del st.session_state['pending_cookie_token']
 
 # ── Image helpers ─────────────────────────────────────────────────────────────
 def img_b64(path: str) -> str:
@@ -201,6 +197,9 @@ with right_col:
                 if success:
                     token = secrets.token_hex(32)
                     SessionsManager().save_session_token(token, username, ttl_hours=72)
+                    
+                    # ✅ PERSISTENT: Set cookie IMMEDIATELY
+                    cookie_manager.set("session_token", token, max_age=72*3600)
 
                     st.session_state.user_id = username
                     st.session_state.display_name = user_config.get("display_name", username)
@@ -208,7 +207,7 @@ with right_col:
                     st.session_state.avatar_path = user_config.get('avatar_path')
                     st.session_state.session_token = token
 
-                    # Dùng pending pattern để set cookie an toàn
+                    # Keep JS backup
                     st.session_state['pending_cookie_token'] = token
 
                     save_session_state()
@@ -256,12 +255,17 @@ with right_col:
                         if succ:
                             token = secrets.token_hex(32)
                             SessionsManager().save_session_token(token, new_username, ttl_hours=72)
+                            
+                            # ✅ PERSISTENT: Set cookie IMMEDIATELY  
+                            cookie_manager.set("session_token", token, max_age=72*3600)
 
                             st.session_state.user_id = new_username
                             st.session_state.display_name = user_config.get("display_name", new_username)
                             st.session_state.user_sheets_config = user_config["sheets_config"]
                             st.session_state.avatar_path = user_config.get('avatar_path')
                             st.session_state.session_token = token
+
+                            # Keep JS backup
                             st.session_state['pending_cookie_token'] = token
 
                             save_session_state()

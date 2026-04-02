@@ -79,14 +79,34 @@ def save_marked_keywords():
     user_id = st.session_state.get('user_id', 'default')
     if user_id != 'default' and 'marked_keywords' in st.session_state:
         keywords_list = [[str(kw), str(day)] for kw, day in st.session_state.marked_keywords]
-        SessionsManager().save_marked_keywords(user_id, keywords_list)
+        db = SessionsManager()
+        # Keep session_data in sync and support both root-level and nested storage
+        existing = db.load_session(user_id) or {}
+        existing['marked_keywords'] = keywords_list
+        db.save_session(user_id, existing)
+        # Keep deprecated root field for backward compatibility
+        db.sessions.update_one(
+            {'user_id': user_id},
+            {'$set': {'marked_keywords': keywords_list, 'updated_at': datetime.utcnow()}},
+            upsert=True
+        )
 
 def load_marked_keywords():
     """Load marked keywords from MongoDB"""
     user_id = st.session_state.get('user_id', 'default')
     if user_id == 'default':
         return set()
-    keywords_list = SessionsManager().load_marked_keywords(user_id)
+    db = SessionsManager()
+    # check direct root field first (legacy path)
+    keywords_list = db.load_marked_keywords(user_id)
+    if not keywords_list:
+        session_data = db.load_session(user_id) or {}
+        if isinstance(session_data, dict) and 'marked_keywords' in session_data:
+            keywords_list = session_data.get('marked_keywords', [])
+        elif isinstance(session_data, dict) and 'session_data' in session_data:
+            keywords_list = session_data['session_data'].get('marked_keywords', [])
+        else:
+            keywords_list = []
     return set(tuple(k) for k in keywords_list)
 
 
@@ -125,68 +145,24 @@ def deserialize_session_data(raw_data):
     
     return data
 
-def load_session_state(restore_auth=False):
-    """Load session from MongoDB. restore_auth=False (secure)."""
-    user_id = st.session_state.get('user_id', 'default')
-    if user_id == 'default':
-        return {}
-    
-    raw_data = SessionsManager().load_session(user_id)
-    return deserialize_session_data(raw_data)
-
-    
-    # Convert string dates back to datetime objects for other data (always)
-    if 'goals' in data:
-        for goal_id, goal in data['goals'].items():
-            if 'deadline' in goal and isinstance(goal['deadline'], str):
-                try:
-                    goal['deadline'] = datetime.fromisoformat(goal['deadline']).date()
-                except Exception:
-                    pass
-            if 'created' in goal and isinstance(goal['created'], str):
-                try:
-                    goal['created'] = datetime.fromisoformat(goal['created'])
-                except Exception:
-                    pass
-    
-    if 'snapshots' in session_data:
-        for snap_name, snap_data in session_data['snapshots'].items():
-            # Convert date string back to datetime
-            if 'date' in snap_data and isinstance(snap_data['date'], str):
-                try:
-                    snap_data['date'] = datetime.fromisoformat(snap_data['date'])
-                except Exception:
-                    try:
-                        snap_data['date'] = datetime.fromisoformat(snap_data['date'].replace(' ', 'T'))
-                    except Exception:
-                        try:
-                            snap_data['date'] = datetime.fromisoformat(snap_data['date']).replace(
-                                hour=0, minute=0, second=0, microsecond=0
-                            )
-                        except Exception:
-                            snap_data['date'] = datetime.now()
-            
-            # Convert stored data (list of records) back to DataFrame
-            if 'data' in snap_data and isinstance(snap_data['data'], list):
-                try:
-                    snap_data['data'] = pd.DataFrame(snap_data['data'])
-                except Exception:
-                    pass
-    
-    return session_data
-
 def load_session_state(restore_auth=True):
     """Load session data from MongoDB"""
-    user_id = st.session_state.get('user_id')
-    if not user_id:
+    user_id = st.session_state.get('user_id', 'default')
+    if user_id == 'default' or not user_id:
         return {}
-    
+
     try:
-        session_data = SessionsManager().load_session(user_id)
-        if restore_auth and 'user_id' not in session_data:
-            session_data['user_id'] = user_id
-        return session_data
-    except:
+        session_data = SessionsManager().load_session(user_id) or {}
+        # Root legacy marked_keywords may exist in collection alongside session_data
+        legacy_marked = SessionsManager().load_marked_keywords(user_id)
+        if legacy_marked:
+            session_data.setdefault('marked_keywords', legacy_marked)
+
+        deserialized = deserialize_session_data(session_data)
+        if restore_auth and 'user_id' not in deserialized:
+            deserialized['user_id'] = user_id
+        return deserialized
+    except Exception:
         return {}
 
 
@@ -233,9 +209,12 @@ def init_session_state():
         if key not in st.session_state:
             st.session_state[key] = saved_session.get(key, {} if key in ['goals', 'snapshots', 'saved_filters', 'notes'] else '' if key == 'selected_domain' else 'dark')
     
-    # Load marked_keywords (convert list of lists to set of tuples)
+    # Load marked_keywords from session state or legacy storage.
     if 'marked_keywords' not in st.session_state:
-        st.session_state.marked_keywords = set()
-    if 'marked_keywords' in saved_session:
+        st.session_state.marked_keywords = load_marked_keywords()
+    elif isinstance(st.session_state.marked_keywords, set):
+        # ensure consistent tuple shape
+        st.session_state.marked_keywords = set(_ for _ in st.session_state.marked_keywords)
+    elif 'marked_keywords' in saved_session:
         st.session_state.marked_keywords = set(tuple(k) for k in saved_session['marked_keywords'])
 
