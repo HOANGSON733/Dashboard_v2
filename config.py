@@ -7,7 +7,8 @@ import streamlit as st
 # ===================== PAGE CONFIG =====================
 def setup_page_config():
     st.set_page_config(
-        page_title="SEO Rank Dashboard Pro",
+        page_title="SEO Rank Dashboard ",
+        page_icon="logocheck.png",
         layout="wide",
         initial_sidebar_state="expanded",
         menu_items=None

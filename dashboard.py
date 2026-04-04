@@ -203,11 +203,14 @@ if 'user_id' in st.session_state:
     sheet_id = selected_config['sheet_id']
 
     client = init_sheets_client()
-    sheet_map = get_available_days(sheet_id, client)
-
-    if not sheet_map:
-        st.error("❌ Không tìm thấy worksheet dạng Ngày_DD_MM_YYYY")
+    if not client:
+        st.error("❌ Sheets client unavailable")
         st.stop()
+        
+    sheet_map = get_available_days(sheet_id, client)
+    if not sheet_map:
+        st.warning("⚠️ No date sheets - check fallbacks. Using empty data.")
+        sheet_map = {}
 
     if 'selected_days' not in locals():
         selected_days = [list(sheet_map.keys())[-1]]
@@ -246,15 +249,12 @@ if 'filtered_date_range' not in st.session_state:
     st.session_state.filtered_date_range = None
 
 if use_date_range and 'sheet_map' in locals():
+    available_dates = sorted([v.date() for v in sheet_map.values()])
     col_start, col_end = st.sidebar.columns(2)
     with col_start:
-        start_date = st.date_input("Từ ngày", value=min(sheet_map.values()),
-            min_value=min(sheet_map.values()), max_value=max(sheet_map.values()),
-            key='date_range_start', format="DD/MM/YYYY")
+        start_date = st.selectbox("Từ ngày", options=available_dates, index=0, format_func=lambda x: x.strftime("%d/%m/%Y"))
     with col_end:
-        end_date = st.date_input("Đến ngày", value=max(sheet_map.values()),
-            min_value=min(sheet_map.values()), max_value=max(sheet_map.values()),
-            key='date_range_end', format="DD/MM/YYYY")
+        end_date = st.selectbox("Đến ngày", options=available_dates, index=len(available_dates)-1, format_func=lambda x: x.strftime("%d/%m/%Y"))
     if st.sidebar.button("Lọc"):
         if start_date > end_date:
             st.sidebar.error("❌ Ngày bắt đầu phải trước hoặc bằng ngày kết thúc")
@@ -274,8 +274,9 @@ else:
         selected_days = [selected_day]
 
 if not selected_days:
-    st.warning("⚠️ Vui lòng chọn ít nhất một ngày")
-    st.stop()
+    st.info("ℹ️ No days selected - using latest available")
+    if sheet_map:
+        selected_days = [list(sheet_map.keys())[-1]]
 
 if len(selected_days) > max_days:
     st.sidebar.error(f"⚠️ Đã chọn {len(selected_days)} ngày!")
