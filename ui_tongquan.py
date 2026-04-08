@@ -423,19 +423,19 @@ def render_tongquan(filtered, sheet_map, selected_days):
 
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("🥇 Top 3", expanded=False):
+        with st.expander(f"🥇 Top 3 ({len(top3_kws)})", expanded=False):
             [st.markdown(f"• **{r['Từ khóa']}** — Hạng {r['Thứ hạng']:.0f}") for _, r in top3_kws.iterrows()] if not top3_kws.empty else st.info("Không có từ khóa nào")
-        with st.expander("🏆 Top 10", expanded=False):
+        with st.expander(f"🏆 Top 10 ({len(top10_kws)})", expanded=False):
             [st.markdown(f"• **{r['Từ khóa']}** — Hạng {r['Thứ hạng']:.0f}") for _, r in top10_kws.iterrows()] if not top10_kws.empty else st.info("Không có từ khóa nào")
-        with st.expander("🎯 Top 20", expanded=False):
+        with st.expander(f"🎯 Top 20 ({len(top20_kws)})", expanded=False):
             [st.markdown(f"• **{r['Từ khóa']}** — Hạng {r['Thứ hạng']:.0f}") for _, r in top20_kws.iterrows()] if not top20_kws.empty else st.info("Không có từ khóa nào")
     with col2:
-        with st.expander("📈 Ngoài Top 20", expanded=False):
+        with st.expander(f"📈 Ngoài Top 20 ({len(outside_top20_kws)})", expanded=False):
             display = outside_top20_kws.head(50)
             [st.markdown(f"• **{r['Từ khóa']}** — Hạng {r['Thứ hạng']:.0f}") for _, r in display.iterrows()] if not display.empty else st.info("Không có từ khóa nào")
             if len(outside_top20_kws) > 50:
                 st.info(f"Chỉ hiển thị 50/{len(outside_top20_kws)} từ khóa.")
-        with st.expander("❌ Chưa có rank", expanded=False):
+        with st.expander(f"❌ Chưa có rank ({len(no_rank_kws)})", expanded=False):
             display = no_rank_kws.head(50)
             [st.markdown(f"• **{r['Từ khóa']}**") for _, r in display.iterrows()] if not display.empty else st.info("Tất cả từ khóa đều có rank")
             if len(no_rank_kws) > 50:
