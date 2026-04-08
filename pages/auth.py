@@ -131,17 +131,11 @@ div[data-testid="element-container"] { margin: 0 !important; padding: 0 !importa
 # ── Cookie manager — khởi tạo DUY NHẤT một lần ──────────────────────────────
 cookie_manager = CookieController()
 
-# ── Xử lý pending cookie (set cookie sau khi login, trước khi redirect) ──────
-if 'pending_cookie_token' in st.session_state:
-    token = st.session_state['pending_cookie_token']
-    # Sử dụng JavaScript để set localStorage thay vì cookie
-    st.markdown(f"""
-    <script>
-    localStorage.setItem('session_token', '{token}');
-    window.location.href = 'dashboard.py';
-    </script>
-    """, unsafe_allow_html=True)
-    del st.session_state['pending_cookie_token']
+# ── Redirect sau đăng nhập/đăng ký (không dùng JS để tránh kẹt history) ──────
+if st.session_state.get("post_login_redirect"):
+    # đảm bảo cookie/session đã được ghi rồi mới chuyển trang
+    st.session_state.pop("post_login_redirect", None)
+    st.switch_page("dashboard.py")
 
 # ── Image helpers ─────────────────────────────────────────────────────────────
 def img_b64(path: str) -> str:
@@ -207,8 +201,8 @@ with right_col:
                     st.session_state.avatar_path = user_config.get('avatar_path')
                     st.session_state.session_token = token
 
-                    # Keep JS backup
-                    st.session_state['pending_cookie_token'] = token
+                    # Redirect ở vòng rerun tiếp theo (đảm bảo state/cookie ổn định)
+                    st.session_state["post_login_redirect"] = True
 
                     save_session_state()
                     init_session_state()
@@ -265,8 +259,8 @@ with right_col:
                             st.session_state.avatar_path = user_config.get('avatar_path')
                             st.session_state.session_token = token
 
-                            # Keep JS backup
-                            st.session_state['pending_cookie_token'] = token
+                            # Redirect ở vòng rerun tiếp theo (đảm bảo state/cookie ổn định)
+                            st.session_state["post_login_redirect"] = True
 
                             save_session_state()
                             init_session_state()
