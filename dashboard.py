@@ -171,16 +171,58 @@ with col_right:
         src = f"data:image/{ext};base64," + _b64.b64encode(open(avatar_path, 'rb').read()).decode()
         avatar_html = f'<img src="{src}" style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid #3b82f6;">'
     else:
+        src = None
         initials = st.session_state.get('display_name', st.session_state.get('user_id', 'U'))[0].upper()
         avatar_html = f'<div style="width:42px;height:42px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;border:2px solid #2563eb;">{initials}</div>'
 
+    # Điều hướng profile bằng Streamlit (tránh href "/profile" làm rơi về auth)
+    # Nếu không có ảnh, dùng chữ cái làm label để không bị "2 cái"
+    avatar_label = "" if src else (initials if 'initials' in locals() else "U")
+    avatar_btn = st.button(avatar_label, key="avatar_profile_btn", help="Mở hồ sơ", use_container_width=False)
+    if avatar_btn:
+        st.switch_page("pages/profile.py")
+
+    bg = f'background-image:url("{src}");' if src else ""
     st.markdown(f"""
     <style>
     div[data-testid="column"]:last-child {{ display:flex;align-items:center;justify-content:flex-end; }}
-    .avatar-link {{ display:inline-block;cursor:pointer;border-radius:50%;line-height:0;transition:transform .15s,box-shadow .15s;text-decoration:none; }}
-    .avatar-link:hover {{ transform:scale(1.08);box-shadow:0 0 0 3px rgba(59,130,246,.35);border-radius:50%; }}
+    div[data-testid="column"]:last-child div[data-testid="stButton"] {{
+        width: 46px !important;
+        min-width: 46px !important;
+        height: 46px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }}
+    div[data-testid="column"]:last-child div[data-testid="stButton"] > button {{
+        width: 46px !important;
+        height: 46px !important;
+        padding: 0 !important;
+        border-radius: 50% !important;
+        border: 0 !important;
+        {bg}
+        background-size: cover !important;
+        background-position: center !important;
+        background-color: #3b82f6 !important;
+        box-shadow: none !important;
+        color: #fff !important;
+        font-weight: 800 !important;
+        font-size: 16px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        line-height: 1 !important;
+        overflow: hidden !important;
+    }}
+    div[data-testid="column"]:last-child div[data-testid="stButton"] > button:hover {{
+        transform: scale(1.08);
+        box-shadow: 0 0 0 3px rgba(59,130,246,.35) !important;
+    }}
+    div[data-testid="column"]:last-child div[data-testid="stButton"] > button:focus {{
+        outline: none !important;
+        box-shadow: 0 0 0 3px rgba(59,130,246,.35) !important;
+    }}
     </style>
-    <a href="/profile" target="_self" class="avatar-link">{avatar_html}</a>
     """, unsafe_allow_html=True)
 
 # ===================== SIDEBAR =====================
